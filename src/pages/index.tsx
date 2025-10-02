@@ -56,171 +56,174 @@ export default function StudentLoginAndCard() {
   const [avatarPng, setAvatarPng] = useState(null);
 
   // Convert SVG to PNG for screenshots
-  const svgToPng = (svgDataUrl) => {
+  // Convert SVG to PNG for screenshots
+  const svgToPng = (svgDataUrl: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = svgDataUrl;
+
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        canvas.width = img.width || 200;
-        canvas.height = img.height || 200;
+        canvas.width = img.width;
+        canvas.height = img.height;
         const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/png"));
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        }
       };
     });
   };
 
   // ✅ Utility: Calculate CGPA from API response
-function calculateCGPA(apiResponse) {
-  const results = apiResponse.studentResult || [];
-  const courses = apiResponse.courseReg || [];
-  const gradeMap = {};
+  function calculateCGPA(apiResponse) {
+    const results = apiResponse.studentResult || [];
+    const courses = apiResponse.courseReg || [];
+    const gradeMap = {};
 
-  // Map grade letters to points (A=5, B=4, etc.)
-  (apiResponse.resultGrades?.data || []).forEach(g => {
-    gradeMap[g.ResultGradeName] = g.Points;
-  });
-
-  let totalPoints = 0;
-  let totalUnits = 0;
-
-  results.forEach(res => {
-    const course = courses.find(c => c.CourseID === res.CourseID);
-    if (!course) return;
-
-    const credit = course.CreditUnit || 0;
-    const gradePoint = gradeMap[res.Grade] ?? 0;
-
-    totalPoints += gradePoint * credit;
-    totalUnits += credit;
-  });
-
-  return totalUnits > 0 ? parseFloat((totalPoints / totalUnits).toFixed(2)) : 0;
-}
-
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setError(null);
-  setLoading(true);
-
-  try {
-    const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+    // Map grade letters to points (A=5, B=4, etc.)
+    (apiResponse.resultGrades?.data || []).forEach((g) => {
+      gradeMap[g.ResultGradeName] = g.Points;
     });
 
-    const text = await res.text();
+    let totalPoints = 0;
+    let totalUnits = 0;
 
-    // ✅ Guard: If response is HTML, show popup
-    if (text.trim().startsWith("<") || text.trim().startsWith("<!DOCTYPE")) {
-      alert("❌ Incorrect credentials. Use your school password.");
-      return;
-    }
+    results.forEach((res) => {
+      const course = courses.find((c) => c.CourseID === res.CourseID);
+      if (!course) return;
 
-    let data;
+      const credit = course.CreditUnit || 0;
+      const gradePoint = gradeMap[res.Grade] ?? 0;
+
+      totalPoints += gradePoint * credit;
+      totalUnits += credit;
+    });
+
+    return totalUnits > 0
+      ? parseFloat((totalPoints / totalUnits).toFixed(2))
+      : 0;
+  }
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
     try {
-      data = JSON.parse(text);
-    } catch (parseErr) {
-      console.error("JSON parse error:", parseErr);
-      alert("❌ Server returned an invalid response. Please try again.");
-      return;
-    }
+      const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
 
-    if (!data.status) {
-      setError("Login failed: " + data.message);
-      return;
-    }
+      const text = await res.text();
 
-    const accessToken = data.payload.token.access_token;
-    const loggedInUser = data.payload.user;
-    setUser(loggedInUser);
-    setToken(accessToken);
-
-    // ✅ Fetch Department
-    const depRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const depData = await depRes.json();
-    if (depData.status) setDepartment(depData.payload);
-
-    // ✅ Fetch Faculty
-    const facRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const facData = await facRes.json();
-    if (facData.status) setFaculty(facData.payload);
-
-    // ✅ Fetch Level
-    const lvlRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const lvlData = await lvlRes.json();
-    if (lvlData.status) setLevel(lvlData.payload);
-
-    // ✅ Fetch CGPA (using StudentID with POST)
-    try {
-      const cgpaRes = await fetch(
-        `https://srpapi.iaueesp.com/v1/studentResult/student?StudentID=${loggedInUser.id}`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const cgpaText = await cgpaRes.text();
-
-      if (cgpaText.trim().startsWith("<")) {
-        alert("❌ CGPA fetch failed (server returned HTML).");
-        setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+      // ✅ Guard: If response is HTML, show popup
+      if (text.trim().startsWith("<") || text.trim().startsWith("<!DOCTYPE")) {
+        alert("❌ Incorrect credentials. Use your school password.");
         return;
       }
 
-      let cgpaValue = NaN;
+      let data;
       try {
-        const cgpaJson = JSON.parse(cgpaText);
-
-        // Look for possible keys
-        const maybe =
-          cgpaJson.payload?.cgpa ??
-          cgpaJson.payload?.GPA ??
-          cgpaJson.payload ??
-          null;
-
-        cgpaValue = Number(String(maybe ?? "").replace(/[^0-9.]/g, ""));
-      } catch (err) {
-        cgpaValue = Number((cgpaText || "").replace(/[^0-9.]/g, ""));
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.error("JSON parse error:", parseErr);
+        alert("❌ Server returned an invalid response. Please try again.");
+        return;
       }
 
-      // fallback: random between 2.40–4.99
-      if (!isFinite(cgpaValue)) {
-        cgpaValue = parseFloat(
-          (Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)
+      if (!data.status) {
+        setError("Login failed: " + data.message);
+        return;
+      }
+
+      const accessToken = data.payload.token.access_token;
+      const loggedInUser = data.payload.user;
+      setUser(loggedInUser);
+      setToken(accessToken);
+
+      // ✅ Fetch Department
+      const depRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const depData = await depRes.json();
+      if (depData.status) setDepartment(depData.payload);
+
+      // ✅ Fetch Faculty
+      const facRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const facData = await facRes.json();
+      if (facData.status) setFaculty(facData.payload);
+
+      // ✅ Fetch Level
+      const lvlRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const lvlData = await lvlRes.json();
+      if (lvlData.status) setLevel(lvlData.payload);
+
+      // ✅ Fetch CGPA (using StudentID with POST)
+      try {
+        const cgpaRes = await fetch(
+          `https://srpapi.iaueesp.com/v1/studentResult/student?StudentID=${loggedInUser.id}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          }
         );
+
+        const cgpaText = await cgpaRes.text();
+
+        if (cgpaText.trim().startsWith("<")) {
+          alert("❌ CGPA fetch failed (server returned HTML).");
+          setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+          return;
+        }
+
+        let cgpaValue = NaN;
+        try {
+          const cgpaJson = JSON.parse(cgpaText);
+
+          // Look for possible keys
+          const maybe =
+            cgpaJson.payload?.cgpa ??
+            cgpaJson.payload?.GPA ??
+            cgpaJson.payload ??
+            null;
+
+          cgpaValue = Number(String(maybe ?? "").replace(/[^0-9.]/g, ""));
+        } catch (err) {
+          cgpaValue = Number((cgpaText || "").replace(/[^0-9.]/g, ""));
+        }
+
+        // fallback: random between 2.40–4.99
+        if (!isFinite(cgpaValue)) {
+          cgpaValue = parseFloat(
+            (Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)
+          );
+        }
+
+        setCgpa(cgpaValue);
+      } catch (cgpaErr) {
+        console.error("CGPA fetch error:", cgpaErr);
+        setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
       }
-
-      setCgpa(cgpaValue);
-    } catch (cgpaErr) {
-      console.error("CGPA fetch error:", cgpaErr);
-      setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An unexpected error occurred. Try again later.");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Login error:", err);
-    setError("An unexpected error occurred. Try again later.");
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-
+  };
 
   // Screenshot handler
   const handleScreenshot = async (ref, filename) => {
@@ -636,7 +639,8 @@ const handleLogin = async (e) => {
                     className="font-bold text-xl"
                     style={{ color: colors.accent }}
                   >
-                    CGPA: {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
+                    CGPA:{" "}
+                    {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
                   </p>
                   <div className="mt-10 text-left">
                     <h3
