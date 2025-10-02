@@ -10,17 +10,24 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "@multiavatar/multiavatar": "^1.0.7",
+    "axios": "^1.12.2",
+    "dom-to-image": "^2.6.0",
+    "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^1.5.11",
+    "lucide-react": "^0.544.0",
+    "next": "15.5.4",
+    "qrcode.react": "^4.2.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.5.4"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@biomejs/biome": "2.2.0",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
     "tailwindcss": "^4",
-    "@biomejs/biome": "2.2.0"
+    "typescript": "^5"
   }
 }

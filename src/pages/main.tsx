@@ -15,10 +15,6 @@ export default function StudentLoginAndCard() {
   const [level, setLevel] = useState(null);
   const [error, setError] = useState(null);
   const [remember, setRemember]  =useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-
 
   const [flipped, setFlipped] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -61,68 +57,63 @@ export default function StudentLoginAndCard() {
     });
   };
 
- const handleLogin = async (e) => {
-  e.preventDefault();
-  setError(null);
-  setLoading(true); // start loading
+  // Login handler
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError(null);
 
-  try {
-    const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+    try {
+      const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
 
-    const text = await res.text(); 
-    if (text.trim().startsWith("<!DOCTYPE")) {
-      setError("Incorrect credentials. Use your school password.");
-      return;
+      const contentType = res.headers.get("content-type");
+      if (contentType?.includes("text/html")) {
+        setError("Server returned HTML instead of JSON. Try again later.");
+        return;
+      }
+
+      const data = await res.json();
+      if (!data.status) {
+        setError("Login failed: " + data.message);
+        return;
+      }
+
+      const accessToken = data.payload.token.access_token;
+      const loggedInUser = data.payload.user;
+      setUser(loggedInUser);
+      setToken(accessToken);
+
+      // Fetch Department
+      const depRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const depData = await depRes.json();
+      if (depData.status) setDepartment(depData.payload);
+
+      // Fetch Faculty
+      const facRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const facData = await facRes.json();
+      if (facData.status) setFaculty(facData.payload);
+
+      // Fetch Level
+      const lvlRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const lvlData = await lvlRes.json();
+      if (lvlData.status) setLevel(lvlData.payload);
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An unexpected error occurred. Try again later.");
     }
-
-    const data = JSON.parse(text);
-
-    if (!data.status) {
-      setError("Login failed: " + data.message);
-      return;
-    }
-
-    const accessToken = data.payload.token.access_token;
-    const loggedInUser = data.payload.user;
-    setUser(loggedInUser);
-    setToken(accessToken);
-
-    // Fetch Department
-    const depRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const depData = await depRes.json();
-    if (depData.status) setDepartment(depData.payload);
-
-    // Fetch Faculty
-    const facRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const facData = await facRes.json();
-    if (facData.status) setFaculty(facData.payload);
-
-    // Fetch Level
-    const lvlRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const lvlData = await lvlRes.json();
-    if (lvlData.status) setLevel(lvlData.payload);
-
-  } catch (err) {
-    console.error("Login error:", err);
-    setError("An unexpected error occurred. Try again later.");
-  } finally {
-    setLoading(false); // stop loading
-  }
-};
-
+  };
 
   // Screenshot handler
   const handleScreenshot = async (ref, filename) => {
@@ -164,7 +155,7 @@ export default function StudentLoginAndCard() {
     ? {
         name: user.FullName,
         id: user.MatNo,
-        course: "Computer Science",
+        course: "Course Placeholder",
         department: department?.DepartmentName || "N/A",
         faculty: faculty?.FacultyName || "N/A",
         level: level?.LevelName || "N/A",
@@ -212,18 +203,6 @@ const refreshAvatar = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-4">
-      {error && (
-  <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
-    {error}
-    <button
-      onClick={() => setError(null)}
-      className="ml-4 font-bold hover:text-gray-200"
-    >
-      ✖
-    </button>
-  </div>
-)}
-
       {!user && (
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black">
       <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg w-full max-w-md p-8 border border-blue-500/30">
@@ -276,59 +255,49 @@ const refreshAvatar = () => {
           {/* Password */}
           <div>
             <label className="block text-sm text-gray-300 mb-1">Password</label>
-            <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2 relative">
-  <svg
-    className="h-5 w-5 text-gray-400 mr-2"
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 11c0-1.657-1.343-3-3-3s-3 1.343-3 3v2h6v-2zM6 15v2a2 2 0 002 2h8a2 2 0 002-2v-2H6z"
-    />
-  </svg>
-  
-  <input
-    type={showPassword ? "text" : "password"}
-    value={password}
-    onChange={(e) => setPassword(e.target.value)}
-    placeholder="********"
-    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400"
-  />
-
-  <button
-    type="button"
-    onClick={() => setShowPassword(!showPassword)}
-    className="absolute right-3 text-gray-400 hover:text-gray-200"
-  >
-    {showPassword ? (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.152.198-2.253.556-3.267M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ) : (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18M10.58 10.58a3 3 0 014.84 4.84M9.879 9.879A3 3 0 0114.12 14.12M12 5c-5.523 0-10 4.477-10 10 0 1.152.198 2.253.556 3.267" />
-      </svg>
-    )}
-  </button>
-</div>
-
+            <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2">
+              <svg
+                className="h-5 w-5 text-gray-400 mr-2"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.657-1.343-3-3-3s-3 1.343-3 3v2h6v-2zM6 15v2a2 2 0 002 2h8a2 2 0 002-2v-2H6z" />
+              </svg>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="********"
+                className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400"
+              />
+            </div>
           </div>
-          {/* Login Button */}
-         <button
-  type="submit"
-  disabled={loading}
-  className={`w-full py-2 rounded-lg shadow-md transition-all text-white ${
-    loading ? "bg-gray-600 cursor-not-allowed" : "bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800"
-  }`}
->
-  {loading ? "Loading..." : "LOGIN"}
-</button>
 
+          {/* Remember + Forgot */}
+          <div className="flex items-center justify-between text-gray-400 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="accent-blue-500"
+              />
+              Remember me
+            </label>
+            <a href="#" className="hover:text-blue-400">
+              Forgot Password?
+            </a>
+          </div>
+
+          {/* Login Button */}
+          <button
+            type="submit"
+            className="w-full py-2 bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-lg shadow-md hover:from-blue-600 hover:to-blue-800 transition-all"
+          >
+            LOGIN
+          </button>
         </form>
       </div>
     </div>
