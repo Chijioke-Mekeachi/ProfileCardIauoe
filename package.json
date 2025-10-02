@@ -13,6 +13,7 @@
     "@multiavatar/multiavatar": "^1.0.7",
     "axios": "^1.12.2",
     "dom-to-image": "^2.6.0",
+    "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "html2canvas-pro": "^1.5.11",
     "lucide-react": "^0.544.0",

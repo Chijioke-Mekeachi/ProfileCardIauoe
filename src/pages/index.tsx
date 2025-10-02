@@ -2,34 +2,129 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Star, Download, Palette } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
-import html2canvas from "html2canvas-pro";
+import html2canvas from "html2canvas";
+import * as htmlToImage from "html-to-image";
+import { toPng } from "html-to-image";
 import multiavatar from "@multiavatar/multiavatar";
+
+interface Colors {
+  primary: string;
+  secondary: string;
+  accent: string;
+  text: string;
+}
+
+interface Theme {
+  primary: string;
+  secondary: string;
+  accent: string;
+  text: string;
+}
+
+interface Department {
+  DepartmentName: string;
+}
+
+interface Faculty {
+  FacultyName: string;
+}
+
+interface Level {
+  LevelName: string;
+}
+
+type Student = {
+  name: string;
+  id: string;
+  course: string;
+  department: string;
+  faculty: string;
+  level: string;
+  cgpa: number;
+  email: string;
+  phone: string;
+  image: string;
+};
+
+interface User {
+  FullName: string;
+  MatNo: string;
+  Email: string;
+  Telephone: string;
+  DepartmentID: string | number;
+  FacultyID: string | number;
+  LevelID: string | number;
+  id: string | number;
+}
+
+interface Themes {
+  [key: string]: Theme;
+}
+
+interface LoginResponse {
+  status: boolean;
+  message?: string;
+  payload?: {
+    token: {
+      access_token: string;
+    };
+    user: {
+      id: string | number;
+      DepartmentID: string | number;
+      FacultyID: string | number;
+      LevelID: string | number;
+      [key: string]: any;
+    };
+  };
+}
+
+interface ResultGrade {
+  ResultGradeName: string;
+  Points: number;
+}
+
+interface Course {
+  CourseID: string | number;
+  CreditUnit: number;
+}
+
+interface StudentResult {
+  CourseID: string | number;
+  Grade: string;
+}
+
+interface ApiResponse {
+  studentResult?: StudentResult[];
+  courseReg?: Course[];
+  resultGrades?: {
+    data?: ResultGrade[];
+  };
+}
 
 export default function StudentLoginAndCard() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [department, setDepartment] = useState(null);
-  const [faculty, setFaculty] = useState(null);
-  const [level, setLevel] = useState(null);
-  const [error, setError] = useState(null);
-  const [remember, setRemember] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [cgpa, setCgpa] = useState<number | null>(null);
+  const [department, setDepartment] = useState<Department | null>(null);
+  const [faculty, setFaculty] = useState<Faculty | null>(null);
+  const [level, setLevel] = useState<Level | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [cgpa, setCgpa] = useState(null);
-
   const [flipped, setFlipped] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [colors, setColors] = useState({
+  const [colors, setColors] = useState<Colors>({
     primary: "#8B5CF6",
     secondary: "#000000",
     accent: "#A78BFA",
     text: "#FFFFFF",
   });
 
-  const frontRef = useRef(null);
-  const backRef = useRef(null);
+  const frontRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
+  const [avatarPng, setAvatarPng] = useState<string | null>(null);
 
   // Random Multiavatar seeds
   const avatarSeeds = [
@@ -45,7 +140,7 @@ export default function StudentLoginAndCard() {
     "juliet",
   ];
 
-  const getRandomAvatar = () => {
+  const getRandomAvatar = (): string => {
     const randomSeed =
       avatarSeeds[Math.floor(Math.random() * avatarSeeds.length)];
     return `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -53,203 +148,263 @@ export default function StudentLoginAndCard() {
     )}`;
   };
 
-  const [avatarPng, setAvatarPng] = useState(null);
-
   // Convert SVG to PNG for screenshots
-  const svgToPng = (svgDataUrl) => {
-    return new Promise((resolve) => {
+  const svgToPng = (svgDataUrl: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const img = new Image();
       img.src = svgDataUrl;
+
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        canvas.width = img.width || 200;
-        canvas.height = img.height || 200;
+        canvas.width = 200;
+        canvas.height = 200;
+
         const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Failed to get 2D context"));
+          return;
+        }
+
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL("image/png"));
+      };
+
+      img.onerror = () => {
+        reject(new Error("Failed to load SVG image"));
       };
     });
   };
 
-  // ✅ Utility: Calculate CGPA from API response
-function calculateCGPA(apiResponse) {
-  const results = apiResponse.studentResult || [];
-  const courses = apiResponse.courseReg || [];
-  const gradeMap = {};
-
-  // Map grade letters to points (A=5, B=4, etc.)
-  (apiResponse.resultGrades?.data || []).forEach(g => {
-    gradeMap[g.ResultGradeName] = g.Points;
-  });
-
-  let totalPoints = 0;
-  let totalUnits = 0;
-
-  results.forEach(res => {
-    const course = courses.find(c => c.CourseID === res.CourseID);
-    if (!course) return;
-
-    const credit = course.CreditUnit || 0;
-    const gradePoint = gradeMap[res.Grade] ?? 0;
-
-    totalPoints += gradePoint * credit;
-    totalUnits += credit;
-  });
-
-  return totalUnits > 0 ? parseFloat((totalPoints / totalUnits).toFixed(2)) : 0;
-}
-
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setError(null);
-  setLoading(true);
-
-  try {
-    const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    const text = await res.text();
-
-    // ✅ Guard: If response is HTML, show popup
-    if (text.trim().startsWith("<") || text.trim().startsWith("<!DOCTYPE")) {
-      alert("❌ Incorrect credentials. Use your school password.");
-      return;
+  // Helper function to convert any color to hex
+  const convertToHex = (color: string): string => {
+    // If it's already a hex color, return it
+    if (/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color)) {
+      return color;
     }
 
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (parseErr) {
-      console.error("JSON parse error:", parseErr);
-      alert("❌ Server returned an invalid response. Please try again.");
-      return;
+    // If it's an rgb/rgba color, convert to hex
+    if (color.startsWith("rgb")) {
+      const rgb = color.match(/\d+/g);
+      if (rgb && rgb.length >= 3) {
+        const r = parseInt(rgb[0]);
+        const g = parseInt(rgb[1]);
+        const b = parseInt(rgb[2]);
+        return `#${((1 << 24) + (r << 16) + (g << 8) + b)
+          .toString(16)
+          .slice(1)}`;
+      }
     }
 
-    if (!data.status) {
-      setError("Login failed: " + data.message);
-      return;
-    }
+    // Handle lab() colors by converting to RGB using canvas
+    if (
+      color.includes("lab(") ||
+      color.includes("lch(") ||
+      color.includes("oklab(")
+    ) {
+      try {
+        // Create a temporary element to let the browser compute the color
+        const tempEl = document.createElement("div");
+        tempEl.style.color = color;
+        document.body.appendChild(tempEl);
+        const computed = window.getComputedStyle(tempEl).color;
+        document.body.removeChild(tempEl);
 
-    const accessToken = data.payload.token.access_token;
-    const loggedInUser = data.payload.user;
-    setUser(loggedInUser);
-    setToken(accessToken);
-
-    // ✅ Fetch Department
-    const depRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const depData = await depRes.json();
-    if (depData.status) setDepartment(depData.payload);
-
-    // ✅ Fetch Faculty
-    const facRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const facData = await facRes.json();
-    if (facData.status) setFaculty(facData.payload);
-
-    // ✅ Fetch Level
-    const lvlRes = await fetch(
-      `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const lvlData = await lvlRes.json();
-    if (lvlData.status) setLevel(lvlData.payload);
-
-    // ✅ Fetch CGPA (using StudentID with POST)
-    try {
-      const cgpaRes = await fetch(
-        `https://srpapi.iaueesp.com/v1/studentResult/student?StudentID=${loggedInUser.id}`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
+        // Now convert the computed RGB to hex
+        if (computed.startsWith("rgb")) {
+          const rgb = computed.match(/\d+/g);
+          if (rgb && rgb.length >= 3) {
+            const r = parseInt(rgb[0]);
+            const g = parseInt(rgb[1]);
+            const b = parseInt(rgb[2]);
+            return `#${((1 << 24) + (r << 16) + (g << 8) + b)
+              .toString(16)
+              .slice(1)}`;
+          }
         }
-      );
+      } catch (e) {
+        // If conversion fails, return a default color
+      }
+    }
 
-      const cgpaText = await cgpaRes.text();
+    // Fallback to transparent/white for unhandled cases
+    return "#FFFFFF";
+  };
 
-      if (cgpaText.trim().startsWith("<")) {
-        alert("❌ CGPA fetch failed (server returned HTML).");
-        setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const text = await res.text();
+
+      if (text.trim().startsWith("<")) {
+        setError("❌ Incorrect credentials. Use your school password.");
+        setLoading(false);
         return;
       }
 
-      let cgpaValue = NaN;
+      let data: LoginResponse;
       try {
-        const cgpaJson = JSON.parse(cgpaText);
-
-        // Look for possible keys
-        const maybe =
-          cgpaJson.payload?.cgpa ??
-          cgpaJson.payload?.GPA ??
-          cgpaJson.payload ??
-          null;
-
-        cgpaValue = Number(String(maybe ?? "").replace(/[^0-9.]/g, ""));
-      } catch (err) {
-        cgpaValue = Number((cgpaText || "").replace(/[^0-9.]/g, ""));
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.error("JSON parse error:", parseErr);
+        setError("❌ Server returned an invalid response. Please try again.");
+        setLoading(false);
+        return;
       }
 
-      // fallback: random between 2.40–4.99
-      if (!isFinite(cgpaValue)) {
-        cgpaValue = parseFloat(
-          (Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)
+      if (!data.status || !data.payload) {
+        setError("Login failed: " + (data.message ?? "Unknown error"));
+        setLoading(false);
+        return;
+      }
+
+      const accessToken = data.payload.token.access_token;
+      const apiUser = data.payload.user;
+
+      const loggedInUser: User = {
+        FullName: apiUser.FullName || apiUser.name || "N/A",
+        MatNo: apiUser.MatNo || apiUser.id || "N/A",
+        Email: apiUser.Email || "N/A",
+        Telephone: apiUser.Telephone || "N/A",
+        DepartmentID: apiUser.DepartmentID,
+        FacultyID: apiUser.FacultyID,
+        LevelID: apiUser.LevelID,
+        id: apiUser.id,
+      };
+
+      setUser(loggedInUser);
+
+      setToken(accessToken);
+
+      // Fetch Department
+      const depRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const depData = await depRes.json();
+      if (depData.status) setDepartment(depData.payload);
+
+      // Fetch Faculty
+      const facRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const facData = await facRes.json();
+      if (facData.status) setFaculty(facData.payload);
+
+      // Fetch Level
+      const lvlRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const lvlData = await lvlRes.json();
+      if (lvlData.status) setLevel(lvlData.payload);
+
+      // Fetch CGPA
+      try {
+        const cgpaRes = await fetch(
+          `https://srpapi.iaueesp.com/v1/studentResult/student?StudentID=${loggedInUser.id}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          }
         );
-      }
 
-      setCgpa(cgpaValue);
-    } catch (cgpaErr) {
-      console.error("CGPA fetch error:", cgpaErr);
-      setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+        const cgpaText = await cgpaRes.text();
+
+        if (cgpaText.trim().startsWith("<")) {
+          console.warn("CGPA fetch failed (server returned HTML).");
+          setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+        } else {
+          let cgpaValue: number = NaN;
+          try {
+            const cgpaJson = JSON.parse(cgpaText);
+            const maybe =
+              cgpaJson.payload?.cgpa ??
+              cgpaJson.payload?.GPA ??
+              cgpaJson.payload ??
+              null;
+            cgpaValue = Number(String(maybe ?? "").replace(/[^0-9.]/g, ""));
+          } catch {
+            cgpaValue = Number((cgpaText || "").replace(/[^0-9.]/g, ""));
+          }
+
+          if (!isFinite(cgpaValue)) {
+            cgpaValue = parseFloat(
+              (Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)
+            );
+          }
+
+          setCgpa(cgpaValue);
+        }
+      } catch (cgpaErr) {
+        console.error("CGPA fetch error:", cgpaErr);
+        setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An unexpected error occurred. Try again later.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Screenshot handler - FIXED to handle lab() colors
+
+  const handleScreenshot = async (
+  ref: React.RefObject<HTMLDivElement | null>,
+  filename: string
+) => {
+  if (!ref.current) return;
+
+  // Save current transform
+  const prevTransform = ref.current.style.transform;
+
+  try {
+    // Temporarily remove rotation
+    ref.current.style.transform = "none";
+
+    const dataUrl = await toPng(ref.current, {
+      cacheBust: true,
+      pixelRatio: 2,
+      backgroundColor: "#1F2937",
+    });
+
+    // Restore original transform
+    ref.current.style.transform = prevTransform;
+
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   } catch (err) {
-    console.error("Login error:", err);
-    setError("An unexpected error occurred. Try again later.");
-  } finally {
-    setLoading(false);
+    console.error("Screenshot error:", err);
+    setError("Failed to download image. Please try again.");
   }
 };
 
 
 
-
-  // Screenshot handler
-  const handleScreenshot = async (ref, filename) => {
-    if (!ref.current) return;
-    const canvas = await html2canvas(ref.current, {
-      backgroundColor: "#1F2937",
-      useCORS: true,
-    });
-    const dataURL = canvas.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.href = dataURL;
-    link.download = filename;
-    link.click();
-  };
-
   // Color/theme logic
-  const handleColorChange = (colorType, value) => {
-    let hexColor = value;
-    if (
-      value.startsWith("rgb") ||
-      value.startsWith("lab") ||
-      value.startsWith("hsl")
-    ) {
-      hexColor = colors[colorType];
-    }
+  const handleColorChange = (colorType: keyof Colors, value: string) => {
+    const hexColor = convertToHex(value);
     setColors((prev) => ({ ...prev, [colorType]: hexColor }));
   };
 
-  const themes = {
+  const themes: Themes = {
     purple: {
       primary: "#8B5CF6",
       secondary: "#000000",
@@ -287,24 +442,29 @@ const handleLogin = async (e) => {
       text: "#F9FAFB",
     },
   };
-  const applyTheme = (themeName) => {
-    if (themes[themeName]) setColors(themes[themeName]);
+
+  const applyTheme = (themeName: string) => {
+    if (themes[themeName]) {
+      setColors(themes[themeName]);
+    }
   };
+
   const getFrontGradient = () =>
     `linear-gradient(135deg, ${colors.primary}20, ${colors.secondary}80, ${colors.primary}20)`;
+
   const getBackGradient = () =>
     `linear-gradient(135deg, ${colors.secondary}, ${colors.primary}80, ${colors.secondary})`;
 
   // Student object
-  const student = user
+  const student: Student | null = user
     ? {
         name: user.FullName,
         id: user.MatNo,
         course: "Computer Science",
-        department: department?.DepartmentName || "N/A",
-        faculty: faculty?.FacultyName || "N/A",
-        level: level?.LevelName || "N/A",
-        cgpa: cgpa,
+        department: department?.DepartmentName ?? "N/A",
+        faculty: faculty?.FacultyName ?? "N/A",
+        level: level?.LevelName ?? "N/A",
+        cgpa: cgpa ?? 0,
         email: user.Email,
         phone: user.Telephone,
         image: getRandomAvatar(),
@@ -312,18 +472,18 @@ const handleLogin = async (e) => {
     : null;
 
   const maxStars = 5;
-  const stars = student ? Math.round((student.cgpa / 5) * maxStars) : 0;
+  const stars = student ? Math.round(((student.cgpa ?? 0) / 5) * maxStars) : 0;
 
   // Convert SVG avatar to PNG once student is set
   useEffect(() => {
     if (student?.image) {
-      svgToPng(student.image).then(setAvatarPng);
+      svgToPng(student.image).then(setAvatarPng).catch(console.error);
     }
-  }, [student]);
+  }, [student?.image]);
 
-  // QR code data (exclude SVG)
+  // QR code data
   const qrData = student
-    ? {
+    ? JSON.stringify({
         name: student.name,
         id: student.id,
         course: student.course,
@@ -333,41 +493,40 @@ const handleLogin = async (e) => {
         cgpa: student.cgpa,
         email: student.email,
         phone: student.phone,
-      }
-    : null;
+      })
+    : "";
+
   // Refresh avatar
   const refreshAvatar = () => {
-    if (!student) return;
     const newSvg = getRandomAvatar();
-    setAvatarPng(null); // reset first
-    svgToPng(newSvg).then(setAvatarPng);
-    // Optional: update student.image to new one for QR
-    student.image = newSvg;
+    setAvatarPng(null);
+    svgToPng(newSvg).then(setAvatarPng).catch(console.error);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-4">
       {error && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
-          {error}
-          <button
-            onClick={() => setError(null)}
-            className="ml-4 font-bold hover:text-gray-200"
-          >
-            ✖
-          </button>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md w-[90vw]">
+          <div className="flex items-center justify-between">
+            <span className="flex-1">{error}</span>
+            <button
+              onClick={() => setError(null)}
+              className="ml-4 font-bold hover:text-gray-200 flex-shrink-0"
+            >
+              ✖
+            </button>
+          </div>
         </div>
       )}
 
-      {!user && (
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg w-full max-w-md p-8 border border-blue-500/30">
-            {/* Top Icon */}
+      {!user ? (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black p-4">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg w-full max-w-md p-6 md:p-8 border border-blue-500/30">
             <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 flex items-center justify-center rounded-full border-2 border-blue-400">
+              <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full border-2 border-blue-400">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8 text-blue-400"
+                  className="h-7 w-7 md:h-8 md:w-8 text-blue-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -382,16 +541,14 @@ const handleLogin = async (e) => {
               </div>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleLogin} className="space-y-5">
-              {/* Username */}
               <div>
                 <label className="block text-sm text-gray-300 mb-1">
                   Username
                 </label>
-                <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2">
+                <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2 border border-blue-500/30">
                   <svg
-                    className="h-5 w-5 text-gray-400 mr-2"
+                    className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -409,19 +566,19 @@ const handleLogin = async (e) => {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Username"
-                    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400"
+                    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400 text-sm md:text-base"
+                    required
                   />
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm text-gray-300 mb-1">
                   Password
                 </label>
-                <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2 relative">
+                <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2 border border-blue-500/30 relative">
                   <svg
-                    className="h-5 w-5 text-gray-400 mr-2"
+                    className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -440,7 +597,8 @@ const handleLogin = async (e) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="********"
-                    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400"
+                    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400 text-sm md:text-base"
+                    required
                   />
 
                   <button
@@ -482,11 +640,11 @@ const handleLogin = async (e) => {
                   </button>
                 </div>
               </div>
-              {/* Login Button */}
+
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full py-2 rounded-lg shadow-md transition-all text-white ${
+                className={`w-full py-3 rounded-lg shadow-md transition-all text-white font-medium text-sm md:text-base ${
                   loading
                     ? "bg-gray-600 cursor-not-allowed"
                     : "bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800"
@@ -497,19 +655,16 @@ const handleLogin = async (e) => {
             </form>
           </div>
         </div>
-      )}
-
-      {student && (
-        <div className="flex flex-col items-center space-y-6">
-          {/* Theme and color pickers */}
-          <div className="flex justify-between items-center w-full max-w-7xl mb-4">
-            <h1 className="text-xl font-bold text-white font-orbitron">
+      ) : (
+        <div className="flex flex-col items-center space-y-6 max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4 mb-4 px-4">
+            <h1 className="text-xl md:text-2xl font-bold text-white text-center sm:text-left">
               Student Profile IAUOE
             </h1>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <select
                 onChange={(e) => applyTheme(e.target.value)}
-                className="bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
+                className="bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600 w-full sm:w-auto text-sm md:text-base"
                 defaultValue=""
               >
                 <option value="">Choose Theme</option>
@@ -521,34 +676,38 @@ const handleLogin = async (e) => {
               </select>
               <button
                 onClick={() => setShowColorPicker(!showColorPicker)}
-                className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                className="flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors w-full sm:w-auto text-sm md:text-base"
               >
-                <Palette className="w-5 h-5" /> Custom Colors
+                <Palette className="w-4 h-4 md:w-5 md:h-5" /> Custom Colors
               </button>
             </div>
           </div>
+
           {showColorPicker && (
-            <div className="bg-gray-700 p-4 border-t border-gray-600 grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {["primary", "secondary", "accent", "text"].map((key) => (
+            <div className="bg-gray-700 p-4 border-t border-gray-600 grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 w-full max-w-2xl mx-4">
+              {Object.keys(colors).map((key) => (
                 <div key={key} className="flex items-center space-x-2">
-                  <label className="text-white text-sm capitalize">
+                  <label className="text-white text-sm capitalize whitespace-nowrap">
                     {key}:
                   </label>
                   <input
                     type="color"
-                    value={colors[key]}
-                    onChange={(e) => handleColorChange(key, e.target.value)}
-                    className="w-8 h-8 rounded cursor-pointer"
+                    value={colors[key as keyof Colors]}
+                    onChange={(e) =>
+                      handleColorChange(key as keyof Colors, e.target.value)
+                    }
+                    className="w-8 h-8 rounded cursor-pointer flex-shrink-0"
                   />
-                  <span className="text-xs text-gray-300">{colors[key]}</span>
+                  <span className="text-xs text-gray-300 hidden sm:inline">
+                    {colors[key as keyof Colors]}
+                  </span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Flip Card */}
           <div
-            className="relative w-full max-w-[44rem] h-[32rem] cursor-pointer [perspective:2000px] "
+            className="relative w-full max-w-4xl h-80 sm:h-96 md:h-[32rem] cursor-pointer [perspective:2000px] mx-4"
             onClick={() => setFlipped(!flipped)}
           >
             <div
@@ -556,56 +715,73 @@ const handleLogin = async (e) => {
                 flipped ? "[transform:rotateY(180deg)]" : ""
               }`}
             >
-              {/* FRONT */}
               <div
                 ref={frontRef}
-                className="absolute w-full h-full rounded-2xl shadow-2xl [backface-visibility:hidden] p-10 flex"
+                className="absolute w-full h-full rounded-2xl shadow-2xl [backface-visibility:hidden] p-4 sm:p-6 md:p-10 flex flex-col md:flex-row"
                 style={{
                   background: getFrontGradient(),
                   border: `2px solid ${colors.primary}`,
                 }}
               >
-                <div className="flex flex-col items-center w-1/2 justify-center">
-                  <img
-                    src={avatarPng || student.image}
-                    alt={student.name}
-                    className="w-44 h-44 rounded-full border-4 shadow-lg"
-                    style={{ borderColor: colors.accent }}
-                  />
+                <div className="flex flex-col items-center w-full md:w-1/2 justify-center mb-4 md:mb-0">
+                  <div className="relative">
+                    <img
+                      src={avatarPng || student?.image || ""}
+                      alt={student?.name || "Student"}
+                      className="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full border-4 shadow-lg object-cover"
+                      style={{ borderColor: colors.accent }}
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        refreshAvatar();
+                      }}
+                      className="absolute -bottom-2 -right-2 bg-blue-600 hover:bg-blue-500 text-white p-1.5 rounded-full shadow-lg text-xs"
+                      title="Refresh Avatar"
+                    >
+                      🔄
+                    </button>
+                  </div>
                   <h2
-                    className="text-xl mt-4 font-bold font-orbitron text-center"
+                    className="text-lg sm:text-xl md:text-xl mt-3 font-bold text-center break-words max-w-full"
                     style={{ color: colors.text }}
                   >
-                    {student.name}
+                    {student?.name}
                   </h2>
-                  <p style={{ color: colors.accent }}>{student.id}</p>
-                  <div className="mt-6 text-lg leading-relaxed text-left">
-                    <p>
+                  <p
+                    className="text-sm md:text-base"
+                    style={{ color: colors.accent }}
+                  >
+                    {student?.id}
+                  </p>
+
+                  <div className="mt-4 text-sm sm:text-base leading-relaxed text-center md:text-left w-full max-w-xs">
+                    <p className="break-words">
                       <span
                         className="font-bold"
                         style={{ color: colors.accent }}
                       >
                         Course:
                       </span>{" "}
-                      {student.course}
+                      {student?.course}
                     </p>
-                    <p>
+                    <p className="break-words">
                       <span
                         className="font-bold"
                         style={{ color: colors.accent }}
                       >
                         Department:
                       </span>{" "}
-                      {student.department}
+                      {student?.department}
                     </p>
-                    <p>
+                    <p className="break-words">
                       <span
                         className="font-bold"
                         style={{ color: colors.accent }}
                       >
                         Faculty:
                       </span>{" "}
-                      {student.faculty}
+                      {student?.faculty}
                     </p>
                     <p>
                       <span
@@ -614,17 +790,17 @@ const handleLogin = async (e) => {
                       >
                         Level:
                       </span>{" "}
-                      {student.level}00
+                      {student?.level}00
                     </p>
                   </div>
                 </div>
 
-                <div className="flex flex-col justify-center items-center w-1/2">
-                  <div className="flex mb-4">
+                <div className="flex flex-col justify-center items-center w-full md:w-1/2">
+                  <div className="flex mb-3 md:mb-4">
                     {[...Array(maxStars)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-8 h-8 ${
+                        className={`w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 ${
                           i < stars
                             ? "text-yellow-400 fill-yellow-400"
                             : "text-gray-600"
@@ -633,71 +809,83 @@ const handleLogin = async (e) => {
                     ))}
                   </div>
                   <p
-                    className="font-bold text-xl"
+                    className="font-bold text-lg sm:text-xl md:text-xl mb-3 md:mb-0"
                     style={{ color: colors.accent }}
                   >
-                    CGPA: {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
+                    CGPA:{" "}
+                    {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
                   </p>
-                  <div className="mt-10 text-left">
+                  <div className="mt-4 text-center md:text-left w-full max-w-xs">
                     <h3
-                      className="text-lg font-semibold mb-2"
+                      className="text-base sm:text-lg font-semibold mb-2"
                       style={{ color: colors.accent }}
                     >
                       Contact Info
                     </h3>
-                    <p>
+                    <p className="break-words text-sm sm:text-base">
                       <span
                         className="font-bold"
                         style={{ color: colors.accent }}
                       >
                         Email:
                       </span>{" "}
-                      {student.email}
+                      {student?.email}
                     </p>
-                    <p>
+                    <p className="break-words text-sm sm:text-base">
                       <span
                         className="font-bold"
                         style={{ color: colors.accent }}
                       >
                         Phone:
                       </span>{" "}
-                      {student.phone}
+                      {student?.phone}
                     </p>
                   </div>
-                  <p className="text-xs mt-6" style={{ color: colors.accent }}>
+                  <p
+                    className="text-xs mt-4 md:mt-6"
+                    style={{ color: colors.accent }}
+                  >
                     (Click card to flip →)
                   </p>
                 </div>
               </div>
 
-              {/* BACK */}
               <div
                 ref={backRef}
-                className="absolute w-full h-full rounded-2xl shadow-2xl p-6 flex flex-col justify-center items-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
+                className="absolute w-full h-full rounded-2xl shadow-2xl p-4 sm:p-6 flex flex-col justify-center items-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
                 style={{
                   background: getBackGradient(),
                   border: `2px solid ${colors.primary}`,
                   color: colors.text,
                 }}
               >
-                <h2 className="text-xl font-bold mb-6 font-orbitron">
+                <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-center">
                   Scan Student QR
                 </h2>
                 {qrData && (
                   <QRCodeCanvas
-                    value={JSON.stringify(qrData)}
-                    size={240}
+                    value={qrData}
+                    size={
+                      window.innerWidth < 640
+                        ? 160
+                        : window.innerWidth < 768
+                        ? 200
+                        : 240
+                    }
                     bgColor={colors.secondary}
                     fgColor={colors.accent}
                     level="H"
                     includeMargin={true}
                   />
                 )}
-                <p className="text-xs mt-4" style={{ color: colors.accent }}>
+                <p
+                  className="text-xs mt-3 sm:mt-4 text-center"
+                  style={{ color: colors.accent }}
+                >
                   Contains student profile data
                 </p>
                 <span
-                  className="absolute bottom-4 text-xs"
+                  className="absolute bottom-3 sm:bottom-4 text-xs"
                   style={{ color: colors.accent }}
                 >
                   (Click to flip back)
@@ -706,28 +894,20 @@ const handleLogin = async (e) => {
             </div>
           </div>
 
-          {/* Download Buttons */}
-          <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full max-w-md px-4">
             <button
               onClick={() => handleScreenshot(frontRef, "student_front.png")}
-              className="flex items-center justify-center gap-2 text-white px-6 py-3 rounded-lg shadow-lg transition-colors font-semibold"
+              className="flex items-center justify-center gap-2 text-white px-4 sm:px-6 py-3 rounded-lg shadow-lg transition-colors font-semibold text-sm sm:text-base flex-1"
               style={{ backgroundColor: colors.primary }}
             >
-              <Download className="w-5 h-5" /> Download Front
-            </button>
-            <button
-              onClick={refreshAvatar}
-              className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-full shadow-lg"
-              title="Refresh Avatar"
-            >
-              Refresh 🔄
+              <Download className="w-4 h-4 sm:w-5 sm:h-5" /> Download Front
             </button>
             <button
               onClick={() => handleScreenshot(backRef, "student_back.png")}
-              className="flex items-center justify-center gap-2 text-white px-6 py-3 rounded-lg shadow-lg transition-colors font-semibold"
+              className="flex items-center justify-center gap-2 text-white px-4 sm:px-6 py-3 rounded-lg shadow-lg transition-colors font-semibold text-sm sm:text-base flex-1"
               style={{ backgroundColor: colors.primary }}
             >
-              <Download className="w-5 h-5" /> Download Back
+              <Download className="w-4 h-4 sm:w-5 sm:h-5" /> Download Back
             </button>
           </div>
         </div>
