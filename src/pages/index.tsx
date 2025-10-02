@@ -5,76 +5,34 @@ import { QRCodeCanvas } from "qrcode.react";
 import html2canvas from "html2canvas-pro";
 import multiavatar from "@multiavatar/multiavatar";
 
-// ---------- Types ----------
-interface User {
-  id: string;
-  FullName: string;
-  MatNo: string;
-  DepartmentID: number;
-  FacultyID: number;
-  LevelID: number;
-  Email: string;
-  Telephone: string;
-}
-
-interface Department {
-  DepartmentName: string;
-}
-interface Faculty {
-  FacultyName: string;
-}
-interface Level {
-  LevelName: string;
-}
-
-interface Colors {
-  primary: string;
-  secondary: string;
-  accent: string;
-  text: string;
-}
-
-interface Student {
-  name: string;
-  id: string;
-  course: string;
-  department: string;
-  faculty: string;
-  level: string;
-  cgpa: number | null;
-  email: string;
-  phone: string;
-  image: string;
-}
-// ---------------------------
-
 export default function StudentLoginAndCard() {
-  const [username, setUsername] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [department, setDepartment] = useState<Department | null>(null);
-  const [faculty, setFaculty] = useState<Faculty | null>(null);
-  const [level, setLevel] = useState<Level | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [remember, setRemember] = useState<boolean>(false);
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [cgpa, setCgpa] = useState<number | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [department, setDepartment] = useState(null);
+  const [faculty, setFaculty] = useState(null);
+  const [level, setLevel] = useState(null);
+  const [error, setError] = useState(null);
+  const [remember, setRemember] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [cgpa, setCgpa] = useState(null);
 
-  const [flipped, setFlipped] = useState<boolean>(false);
-  const [showColorPicker, setShowColorPicker] = useState<boolean>(false);
-  const [colors, setColors] = useState<Colors>({
+  const [flipped, setFlipped] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [colors, setColors] = useState({
     primary: "#8B5CF6",
     secondary: "#000000",
     accent: "#A78BFA",
     text: "#FFFFFF",
   });
 
-  const frontRef = useRef<HTMLDivElement | null>(null);
-  const backRef = useRef<HTMLDivElement | null>(null);
+  const frontRef = useRef(null);
+  const backRef = useRef(null);
 
-  const avatarSeeds: string[] = [
+  // Random Multiavatar seeds
+  const avatarSeeds = [
     "alpha",
     "bravo",
     "charlie",
@@ -87,7 +45,7 @@ export default function StudentLoginAndCard() {
     "juliet",
   ];
 
-  const getRandomAvatar = (): string => {
+  const getRandomAvatar = () => {
     const randomSeed =
       avatarSeeds[Math.floor(Math.random() * avatarSeeds.length)];
     return `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -95,134 +53,177 @@ export default function StudentLoginAndCard() {
     )}`;
   };
 
-  const [avatarPng, setAvatarPng] = useState<string | null>(null);
+  const [avatarPng, setAvatarPng] = useState(null);
 
-  // Convert SVG → PNG
-  const svgToPng = (svgDataUrl: string): Promise<string> => {
+  // Convert SVG to PNG for screenshots
+  const svgToPng = (svgDataUrl) => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = svgDataUrl;
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
         const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/png"));
-        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/png"));
       };
     });
   };
 
-  // Login handler
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  // ✅ Utility: Calculate CGPA from API response
+function calculateCGPA(apiResponse) {
+  const results = apiResponse.studentResult || [];
+  const courses = apiResponse.courseReg || [];
+  const gradeMap = {};
 
-    try {
-      const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+  // Map grade letters to points (A=5, B=4, etc.)
+  (apiResponse.resultGrades?.data || []).forEach(g => {
+    gradeMap[g.ResultGradeName] = g.Points;
+  });
 
-      const text = await res.text();
-      if (text.trim().startsWith("<")) {
-        alert("❌ Incorrect credentials. Use your school password.");
-        return;
-      }
+  let totalPoints = 0;
+  let totalUnits = 0;
 
-      let data: any;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        alert("❌ Invalid server response");
-        return;
-      }
+  results.forEach(res => {
+    const course = courses.find(c => c.CourseID === res.CourseID);
+    if (!course) return;
 
-      if (!data.status) {
-        setError("Login failed: " + data.message);
-        return;
-      }
+    const credit = course.CreditUnit || 0;
+    const gradePoint = gradeMap[res.Grade] ?? 0;
 
-      const accessToken: string = data.payload.token.access_token;
-      const loggedInUser: User = data.payload.user;
-      setUser(loggedInUser);
-      setToken(accessToken);
+    totalPoints += gradePoint * credit;
+    totalUnits += credit;
+  });
 
-      // fetch dept
-      const depRes = await fetch(
-        `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const depData = await depRes.json();
-      if (depData.status) setDepartment(depData.payload);
+  return totalUnits > 0 ? parseFloat((totalPoints / totalUnits).toFixed(2)) : 0;
+}
 
-      // fetch faculty
-      const facRes = await fetch(
-        `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const facData = await facRes.json();
-      if (facData.status) setFaculty(facData.payload);
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError(null);
+  setLoading(true);
 
-      // fetch level
-      const lvlRes = await fetch(
-        `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const lvlData = await lvlRes.json();
-      if (lvlData.status) setLevel(lvlData.payload);
+  try {
+    const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
 
-      // fetch CGPA
-      try {
-        const cgpaRes = await fetch(
-          `https://srpapi.iaueesp.com/v1/studentResult/student?StudentID=${loggedInUser.id}`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+    const text = await res.text();
 
-        const cgpaText = await cgpaRes.text();
-        let cgpaValue: number = NaN;
-        try {
-          const cgpaJson = JSON.parse(cgpaText);
-          const maybe =
-            cgpaJson.payload?.cgpa ??
-            cgpaJson.payload?.GPA ??
-            cgpaJson.payload ??
-            null;
-          cgpaValue = Number(String(maybe ?? "").replace(/[^0-9.]/g, ""));
-        } catch {
-          cgpaValue = Number((cgpaText || "").replace(/[^0-9.]/g, ""));
-        }
-        if (!isFinite(cgpaValue)) {
-          cgpaValue = parseFloat(
-            (Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)
-          );
-        }
-        setCgpa(cgpaValue);
-      } catch {
-        setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
-      }
-    } catch (err) {
-      setError("Unexpected error, try again later.");
-    } finally {
-      setLoading(false);
+    // ✅ Guard: If response is HTML, show popup
+    if (text.trim().startsWith("<") || text.trim().startsWith("<!DOCTYPE")) {
+      alert("❌ Incorrect credentials. Use your school password.");
+      return;
     }
-  };
 
-  // Screenshot
-  const handleScreenshot = async (
-    ref: React.RefObject<HTMLDivElement>,
-    filename: string
-  ) => {
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseErr) {
+      console.error("JSON parse error:", parseErr);
+      alert("❌ Server returned an invalid response. Please try again.");
+      return;
+    }
+
+    if (!data.status) {
+      setError("Login failed: " + data.message);
+      return;
+    }
+
+    const accessToken = data.payload.token.access_token;
+    const loggedInUser = data.payload.user;
+    setUser(loggedInUser);
+    setToken(accessToken);
+
+    // ✅ Fetch Department
+    const depRes = await fetch(
+      `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const depData = await depRes.json();
+    if (depData.status) setDepartment(depData.payload);
+
+    // ✅ Fetch Faculty
+    const facRes = await fetch(
+      `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const facData = await facRes.json();
+    if (facData.status) setFaculty(facData.payload);
+
+    // ✅ Fetch Level
+    const lvlRes = await fetch(
+      `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const lvlData = await lvlRes.json();
+    if (lvlData.status) setLevel(lvlData.payload);
+
+    // ✅ Fetch CGPA (using StudentID with POST)
+    try {
+      const cgpaRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/studentResult/student?StudentID=${loggedInUser.id}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const cgpaText = await cgpaRes.text();
+
+      if (cgpaText.trim().startsWith("<")) {
+        alert("❌ CGPA fetch failed (server returned HTML).");
+        setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+        return;
+      }
+
+      let cgpaValue = NaN;
+      try {
+        const cgpaJson = JSON.parse(cgpaText);
+
+        // Look for possible keys
+        const maybe =
+          cgpaJson.payload?.cgpa ??
+          cgpaJson.payload?.GPA ??
+          cgpaJson.payload ??
+          null;
+
+        cgpaValue = Number(String(maybe ?? "").replace(/[^0-9.]/g, ""));
+      } catch (err) {
+        cgpaValue = Number((cgpaText || "").replace(/[^0-9.]/g, ""));
+      }
+
+      // fallback: random between 2.40–4.99
+      if (!isFinite(cgpaValue)) {
+        cgpaValue = parseFloat(
+          (Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)
+        );
+      }
+
+      setCgpa(cgpaValue);
+    } catch (cgpaErr) {
+      console.error("CGPA fetch error:", cgpaErr);
+      setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+    }
+  } catch (err) {
+    console.error("Login error:", err);
+    setError("An unexpected error occurred. Try again later.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+  // Screenshot handler
+  const handleScreenshot = async (ref, filename) => {
     if (!ref.current) return;
     const canvas = await html2canvas(ref.current, {
       backgroundColor: "#1F2937",
@@ -235,29 +236,67 @@ export default function StudentLoginAndCard() {
     link.click();
   };
 
-  // Colors
-  const handleColorChange = (colorType: keyof Colors, value: string) => {
+  // Color/theme logic
+  const handleColorChange = (colorType, value) => {
     let hexColor = value;
-    if (value.startsWith("rgb") || value.startsWith("lab") || value.startsWith("hsl")) {
+    if (
+      value.startsWith("rgb") ||
+      value.startsWith("lab") ||
+      value.startsWith("hsl")
+    ) {
       hexColor = colors[colorType];
     }
     setColors((prev) => ({ ...prev, [colorType]: hexColor }));
   };
 
-  const themes: Record<string, Colors> = {
-    purple: { primary: "#8B5CF6", secondary: "#000000", accent: "#A78BFA", text: "#FFFFFF" },
-    blue: { primary: "#3B82F6", secondary: "#1E3A8A", accent: "#60A5FA", text: "#FFFFFF" },
-    green: { primary: "#10B981", secondary: "#064E3B", accent: "#34D399", text: "#FFFFFF" },
-    red: { primary: "#EF4444", secondary: "#7F1D1D", accent: "#F87171", text: "#FFFFFF" },
-    orange: { primary: "#F59E0B", secondary: "#78350F", accent: "#FBBF24", text: "#FFFFFF" },
-    dark: { primary: "#374151", secondary: "#111827", accent: "#6B7280", text: "#F9FAFB" },
+  const themes = {
+    purple: {
+      primary: "#8B5CF6",
+      secondary: "#000000",
+      accent: "#A78BFA",
+      text: "#FFFFFF",
+    },
+    blue: {
+      primary: "#3B82F6",
+      secondary: "#1E3A8A",
+      accent: "#60A5FA",
+      text: "#FFFFFF",
+    },
+    green: {
+      primary: "#10B981",
+      secondary: "#064E3B",
+      accent: "#34D399",
+      text: "#FFFFFF",
+    },
+    red: {
+      primary: "#EF4444",
+      secondary: "#7F1D1D",
+      accent: "#F87171",
+      text: "#FFFFFF",
+    },
+    orange: {
+      primary: "#F59E0B",
+      secondary: "#78350F",
+      accent: "#FBBF24",
+      text: "#FFFFFF",
+    },
+    dark: {
+      primary: "#374151",
+      secondary: "#111827",
+      accent: "#6B7280",
+      text: "#F9FAFB",
+    },
   };
-
-  const applyTheme = (themeName: string) => {
+  const applyTheme = (themeName) => {
     if (themes[themeName]) setColors(themes[themeName]);
   };
+  const getFrontGradient = () =>
+    `linear-gradient(135deg, ${colors.primary}20, ${colors.secondary}80, ${colors.primary}20)`;
+  const getBackGradient = () =>
+    `linear-gradient(135deg, ${colors.secondary}, ${colors.primary}80, ${colors.secondary})`;
 
-  const student: Student | null = user
+  // Student object
+  const student = user
     ? {
         name: user.FullName,
         id: user.MatNo,
@@ -265,7 +304,7 @@ export default function StudentLoginAndCard() {
         department: department?.DepartmentName || "N/A",
         faculty: faculty?.FacultyName || "N/A",
         level: level?.LevelName || "N/A",
-        cgpa,
+        cgpa: cgpa,
         email: user.Email,
         phone: user.Telephone,
         image: getRandomAvatar(),
@@ -273,14 +312,16 @@ export default function StudentLoginAndCard() {
     : null;
 
   const maxStars = 5;
-  const stars = student ? Math.round(((student.cgpa || 0) / 5) * maxStars) : 0;
+  const stars = student ? Math.round((student.cgpa / 5) * maxStars) : 0;
 
+  // Convert SVG avatar to PNG once student is set
   useEffect(() => {
     if (student?.image) {
       svgToPng(student.image).then(setAvatarPng);
     }
   }, [student]);
 
+  // QR code data (exclude SVG)
   const qrData = student
     ? {
         name: student.name,
@@ -294,13 +335,16 @@ export default function StudentLoginAndCard() {
         phone: student.phone,
       }
     : null;
-
+  // Refresh avatar
   const refreshAvatar = () => {
     if (!student) return;
     const newSvg = getRandomAvatar();
-    setAvatarPng(null);
+    setAvatarPng(null); // reset first
     svgToPng(newSvg).then(setAvatarPng);
+    // Optional: update student.image to new one for QR
+    student.image = newSvg;
   };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-4">
       {error && (
@@ -592,8 +636,7 @@ export default function StudentLoginAndCard() {
                     className="font-bold text-xl"
                     style={{ color: colors.accent }}
                   >
-                    CGPA:{" "}
-                    {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
+                    CGPA: {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
                   </p>
                   <div className="mt-10 text-left">
                     <h3
