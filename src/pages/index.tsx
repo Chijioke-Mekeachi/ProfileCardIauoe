@@ -76,34 +76,6 @@ export default function StudentLoginAndCard() {
   };
 
   // ✅ Utility: Calculate CGPA from API response
-  function calculateCGPA(apiResponse) {
-    const results = apiResponse.studentResult || [];
-    const courses = apiResponse.courseReg || [];
-    const gradeMap = {};
-
-    // Map grade letters to points (A=5, B=4, etc.)
-    (apiResponse.resultGrades?.data || []).forEach((g) => {
-      gradeMap[g.ResultGradeName] = g.Points;
-    });
-
-    let totalPoints = 0;
-    let totalUnits = 0;
-
-    results.forEach((res) => {
-      const course = courses.find((c) => c.CourseID === res.CourseID);
-      if (!course) return;
-
-      const credit = course.CreditUnit || 0;
-      const gradePoint = gradeMap[res.Grade] ?? 0;
-
-      totalPoints += gradePoint * credit;
-      totalUnits += credit;
-    });
-
-    return totalUnits > 0
-      ? parseFloat((totalPoints / totalUnits).toFixed(2))
-      : 0;
-  }
 
   const handleLogin = async (e) => {
     e.preventDefault();
