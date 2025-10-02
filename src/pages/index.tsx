@@ -524,20 +524,8 @@ export default function StudentLoginAndCard() {
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg w-full max-w-md p-6 md:p-8 border border-blue-500/30">
             <div className="flex justify-center mb-6">
               <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full border-2 border-blue-400">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-7 w-7 md:h-8 md:w-8 text-blue-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-9 13V5"
-                  />
-                </svg>
+                <p>IAUOE</p>
+                {/* </svg> */}
               </div>
             </div>
 
