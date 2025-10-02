@@ -77,7 +77,7 @@ export default function StudentLoginAndCard() {
 
   // ✅ Utility: Calculate CGPA from API response
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e :React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
