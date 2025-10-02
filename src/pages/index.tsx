@@ -504,402 +504,315 @@ export default function StudentLoginAndCard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-4">
-      {error && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md w-[90vw]">
-          <div className="flex items-center justify-between">
-            <span className="flex-1">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="ml-4 font-bold hover:text-gray-200 flex-shrink-0"
-            >
-              ✖
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!user ? (
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black p-4">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg w-full max-w-md p-6 md:p-8 border border-blue-500/30">
-            <div className="flex justify-center mb-6">
-              <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full border-2 border-blue-400">
-                <p>IAUOE</p>
-                {/* </svg> */}
-              </div>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">
-                  Username
-                </label>
-                <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2 border border-blue-500/30">
-                  <svg
-                    className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5.121 17.804A4 4 0 017.757 16h8.486a4 4 0 012.636 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Username"
-                    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400 text-sm md:text-base"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">
-                  Password
-                </label>
-                <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2 border border-blue-500/30 relative">
-                  <svg
-                    className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 11c0-1.657-1.343-3-3-3s-3 1.343-3 3v2h6v-2zM6 15v2a2 2 0 002 2h8a2 2 0 002-2v-2H6z"
-                    />
-                  </svg>
-
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="********"
-                    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400 text-sm md:text-base"
-                    required
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-gray-400 hover:text-gray-200"
-                  >
-                    {showPassword ? (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.152.198-2.253.556-3.267M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 3l18 18M10.58 10.58a3 3 0 014.84 4.84M9.879 9.879A3 3 0 0114.12 14.12M12 5c-5.523 0-10 4.477-10 10 0 1.152.198 2.253.556 3.267"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full py-3 rounded-lg shadow-md transition-all text-white font-medium text-sm md:text-base ${
-                  loading
-                    ? "bg-gray-600 cursor-not-allowed"
-                    : "bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800"
-                }`}
-              >
-                {loading ? "Loading..." : "LOGIN"}
-              </button>
-            </form>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center space-y-6 max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4 mb-4 px-4">
-            <h1 className="text-xl md:text-2xl font-bold text-white text-center sm:text-left">
-              Student Profile IAUOE
-            </h1>
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-              <select
-                onChange={(e) => applyTheme(e.target.value)}
-                className="bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600 w-full sm:w-auto text-sm md:text-base"
-                defaultValue=""
-              >
-                <option value="">Choose Theme</option>
-                {Object.keys(themes).map((key) => (
-                  <option key={key} value={key}>
-                    {key.charAt(0).toUpperCase() + key.slice(1)}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => setShowColorPicker(!showColorPicker)}
-                className="flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors w-full sm:w-auto text-sm md:text-base"
-              >
-                <Palette className="w-4 h-4 md:w-5 md:h-5" /> Custom Colors
-              </button>
-            </div>
-          </div>
-
-          {showColorPicker && (
-            <div className="bg-gray-700 p-4 border-t border-gray-600 grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 w-full max-w-2xl mx-4">
-              {Object.keys(colors).map((key) => (
-                <div key={key} className="flex items-center space-x-2">
-                  <label className="text-white text-sm capitalize whitespace-nowrap">
-                    {key}:
-                  </label>
-                  <input
-                    type="color"
-                    value={colors[key as keyof Colors]}
-                    onChange={(e) =>
-                      handleColorChange(key as keyof Colors, e.target.value)
-                    }
-                    className="w-8 h-8 rounded cursor-pointer flex-shrink-0"
-                  />
-                  <span className="text-xs text-gray-300 hidden sm:inline">
-                    {colors[key as keyof Colors]}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div
-            className="relative w-full max-w-4xl h-80 sm:h-96 md:h-[32rem] cursor-pointer [perspective:2000px] mx-4"
-            onClick={() => setFlipped(!flipped)}
-          >
-            <div
-              className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${
-                flipped ? "[transform:rotateY(180deg)]" : ""
-              }`}
-            >
-              <div
-                ref={frontRef}
-                className="absolute w-full h-full rounded-2xl shadow-2xl [backface-visibility:hidden] p-4 sm:p-6 md:p-10 flex flex-col md:flex-row"
-                style={{
-                  background: getFrontGradient(),
-                  border: `2px solid ${colors.primary}`,
-                }}
-              >
-                <div className="flex flex-col items-center w-full md:w-1/2 justify-center mb-4 md:mb-0">
-                  <div className="relative">
-                    <img
-                      src={avatarPng || student?.image || ""}
-                      alt={student?.name || "Student"}
-                      className="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full border-4 shadow-lg object-cover"
-                      style={{ borderColor: colors.accent }}
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        refreshAvatar();
-                      }}
-                      className="absolute -bottom-2 -right-2 bg-blue-600 hover:bg-blue-500 text-white p-1.5 rounded-full shadow-lg text-xs"
-                      title="Refresh Avatar"
-                    >
-                      🔄
-                    </button>
-                  </div>
-                  <h2
-                    className="text-lg sm:text-xl md:text-xl mt-3 font-bold text-center break-words max-w-full"
-                    style={{ color: colors.text }}
-                  >
-                    {student?.name}
-                  </h2>
-                  <p
-                    className="text-sm md:text-base"
-                    style={{ color: colors.accent }}
-                  >
-                    {student?.id}
-                  </p>
-
-                  <div className="mt-4 text-sm sm:text-base leading-relaxed text-center md:text-left w-full max-w-xs">
-                    <p className="break-words">
-                      <span
-                        className="font-bold"
-                        style={{ color: colors.accent }}
-                      >
-                        Course:
-                      </span>{" "}
-                      {student?.course}
-                    </p>
-                    <p className="break-words">
-                      <span
-                        className="font-bold"
-                        style={{ color: colors.accent }}
-                      >
-                        Department:
-                      </span>{" "}
-                      {student?.department}
-                    </p>
-                    <p className="break-words">
-                      <span
-                        className="font-bold"
-                        style={{ color: colors.accent }}
-                      >
-                        Faculty:
-                      </span>{" "}
-                      {student?.faculty}
-                    </p>
-                    <p>
-                      <span
-                        className="font-bold"
-                        style={{ color: colors.accent }}
-                      >
-                        Level:
-                      </span>{" "}
-                      {student?.level}00
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col justify-center items-center w-full md:w-1/2">
-                  <div className="flex mb-3 md:mb-4">
-                    {[...Array(maxStars)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 ${
-                          i < stars
-                            ? "text-yellow-400 fill-yellow-400"
-                            : "text-gray-600"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p
-                    className="font-bold text-lg sm:text-xl md:text-xl mb-3 md:mb-0"
-                    style={{ color: colors.accent }}
-                  >
-                    CGPA:{" "}
-                    {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
-                  </p>
-                  <div className="mt-4 text-center md:text-left w-full max-w-xs">
-                    <h3
-                      className="text-base sm:text-lg font-semibold mb-2"
-                      style={{ color: colors.accent }}
-                    >
-                      Contact Info
-                    </h3>
-                    <p className="break-words text-sm sm:text-base">
-                      <span
-                        className="font-bold"
-                        style={{ color: colors.accent }}
-                      >
-                        Email:
-                      </span>{" "}
-                      {student?.email}
-                    </p>
-                    <p className="break-words text-sm sm:text-base">
-                      <span
-                        className="font-bold"
-                        style={{ color: colors.accent }}
-                      >
-                        Phone:
-                      </span>{" "}
-                      {student?.phone}
-                    </p>
-                  </div>
-                  <p
-                    className="text-xs mt-4 md:mt-6"
-                    style={{ color: colors.accent }}
-                  >
-                    (Click card to flip →)
-                  </p>
-                </div>
-              </div>
-
-              <div
-                ref={backRef}
-                className="absolute w-full h-full rounded-2xl shadow-2xl p-4 sm:p-6 flex flex-col justify-center items-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
-                style={{
-                  background: getBackGradient(),
-                  border: `2px solid ${colors.primary}`,
-                  color: colors.text,
-                }}
-              >
-                <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-center">
-                  Scan Student QR
-                </h2>
-                {qrData && (
-                  <QRCodeCanvas
-                    value={qrData}
-                    size={
-                      window.innerWidth < 640
-                        ? 160
-                        : window.innerWidth < 768
-                        ? 200
-                        : 240
-                    }
-                    bgColor={colors.secondary}
-                    fgColor={colors.accent}
-                    level="H"
-                    includeMargin={true}
-                  />
-                )}
-                <p
-                  className="text-xs mt-3 sm:mt-4 text-center"
-                  style={{ color: colors.accent }}
-                >
-                  Contains student profile data
-                </p>
-                <span
-                  className="absolute bottom-3 sm:bottom-4 text-xs"
-                  style={{ color: colors.accent }}
-                >
-                  (Click to flip back)
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full max-w-md px-4">
-            <button
-              onClick={() => handleScreenshot(frontRef, "student_front.png")}
-              className="flex items-center justify-center gap-2 text-white px-4 sm:px-6 py-3 rounded-lg shadow-lg transition-colors font-semibold text-sm sm:text-base flex-1"
-              style={{ backgroundColor: colors.primary }}
-            >
-              <Download className="w-4 h-4 sm:w-5 sm:h-5" /> Download Front
-            </button>
-            <button
-              onClick={() => handleScreenshot(backRef, "student_back.png")}
-              className="flex items-center justify-center gap-2 text-white px-4 sm:px-6 py-3 rounded-lg shadow-lg transition-colors font-semibold text-sm sm:text-base flex-1"
-              style={{ backgroundColor: colors.primary }}
-            >
-              <Download className="w-4 h-4 sm:w-5 sm:h-5" /> Download Back
-            </button>
-          </div>
-        </div>
-      )}
+  <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-4">
+  {error && (
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-lg z-50 max-w-md w-[90vw]">
+      <div className="flex items-center justify-between">
+        <span className="flex-1 text-xs sm:text-sm">{error}</span>
+        <button
+          onClick={() => setError(null)}
+          className="ml-2 sm:ml-4 font-bold hover:text-gray-200 flex-shrink-0 text-xs sm:text-base"
+        >
+          ✖
+        </button>
+      </div>
     </div>
+  )}
+
+  {!user ? (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black p-2 sm:p-4">
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg w-full max-w-md p-4 sm:p-6 md:p-8 border border-blue-500/30">
+        <div className="flex justify-center mb-4 sm:mb-6">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full border-2 border-blue-400 text-[10px] sm:text-xs md:text-sm">
+            IAUOE
+          </div>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-3 sm:space-y-5">
+          <div>
+            <label className="block text-xs sm:text-sm text-gray-300 mb-1">
+              Username
+            </label>
+            <div className="flex items-center bg-blue-950/50 rounded-md px-2 sm:px-3 py-1.5 sm:py-2 border border-blue-500/30">
+              <svg
+                className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 mr-1 sm:mr-2 flex-shrink-0"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5.121 17.804A4 4 0 017.757 16h8.486a4 4 0 012.636 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username"
+                className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400 text-[10px] sm:text-sm md:text-base"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs sm:text-sm text-gray-300 mb-1">
+              Password
+            </label>
+            <div className="flex items-center bg-blue-950/50 rounded-md px-2 sm:px-3 py-1.5 sm:py-2 border border-blue-500/30 relative">
+              <svg
+                className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 mr-1 sm:mr-2 flex-shrink-0"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 11c0-1.657-1.343-3-3-3s-3 1.343-3 3v2h6v-2zM6 15v2a2 2 0 002 2h8a2 2 0 002-2v-2H6z"
+                />
+              </svg>
+
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="********"
+                className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400 text-[10px] sm:text-sm md:text-base"
+                required
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 sm:right-3 text-gray-400 hover:text-gray-200"
+              >
+                {showPassword ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 sm:h-5 sm:w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.152.198-2.253.556-3.267M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 sm:h-5 sm:w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 3l18 18M10.58 10.58a3 3 0 014.84 4.84M9.879 9.879A3 3 0 0114.12 14.12M12 5c-5.523 0-10 4.477-10 10 0 1.152.198 2.253.556 3.267"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full py-2 sm:py-3 rounded-lg shadow-md transition-all text-white font-medium text-[10px] sm:text-sm md:text-base ${
+              loading
+                ? "bg-gray-600 cursor-not-allowed"
+                : "bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800"
+            }`}
+          >
+            {loading ? "Loading..." : "LOGIN"}
+          </button>
+        </form>
+      </div>
+    </div>
+  ) : (
+    <div className="flex flex-col items-center space-y-4 sm:space-y-6 max-w-7xl mx-auto w-full">
+      {/* Refresh Avatar Button */}
+      <button
+        onClick={refreshAvatar}
+        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm sm:text-base mb-2"
+      >
+         Refresh Avatar
+      </button>
+
+      {/* Flip Card */}
+      <div
+        className="relative w-full max-w-4xl h-80 sm:h-96 md:h-[32rem] cursor-pointer [perspective:2000px] mx-2 sm:mx-4"
+        onClick={() => setFlipped(!flipped)}
+      >
+        <div
+          className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${
+            flipped ? "[transform:rotateY(180deg)]" : ""
+          }`}
+        >
+          {/* Front Card */}
+          <div
+            ref={frontRef}
+            className="absolute w-full h-full rounded-2xl shadow-2xl [backface-visibility:hidden] p-2 sm:p-6 md:p-10 flex flex-col md:flex-row"
+            style={{
+              background: getFrontGradient(),
+              border: `2px solid ${colors.primary}`,
+            }}
+          >
+            {/* Left Side */}
+            <div className="flex flex-col items-center w-full md:w-1/2 justify-center mb-2 md:mb-0">
+              <img
+                src={student?.image || ""}
+                alt={student?.name || "Student"}
+                className="w-20 h-20 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full border-4 shadow-lg object-cover"
+                style={{ borderColor: colors.accent }}
+              />
+              <h2
+                className="text-xs sm:text-lg md:text-xl mt-2 sm:mt-3 font-bold text-center break-words max-w-full"
+                style={{ color: colors.text }}
+              >
+                {student?.name}
+              </h2>
+              <p className="text-[10px] sm:text-sm md:text-base" style={{ color: colors.accent }}>
+                {student?.id}
+              </p>
+              <div className="mt-2 sm:mt-4 text-[10px] sm:text-sm md:text-base leading-relaxed text-center md:text-left w-full max-w-xs">
+                <p>
+                  <span className="font-bold" style={{ color: colors.accent }}>
+                    Course:
+                  </span>{" "}
+                  {student?.course}
+                </p>
+                <p>
+                  <span className="font-bold" style={{ color: colors.accent }}>
+                    Department:
+                  </span>{" "}
+                  {student?.department}
+                </p>
+                <p>
+                  <span className="font-bold" style={{ color: colors.accent }}>
+                    Faculty:
+                  </span>{" "}
+                  {student?.faculty}
+                </p>
+                <p>
+                  <span className="font-bold" style={{ color: colors.accent }}>
+                    Level:
+                  </span>{" "}
+                  {student?.level}00
+                </p>
+              </div>
+            </div>
+
+            {/* Right Side */}
+            <div className="flex flex-col justify-center items-center w-full md:w-1/2 mt-2 md:mt-0">
+              <div className="flex mb-1 sm:mb-3 md:mb-4">
+                {[...Array(maxStars)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-3 h-3 sm:w-6 sm:h-6 md:w-8 md:h-8 ${
+                      i < stars ? "text-yellow-400 fill-yellow-400" : "text-gray-600"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <p
+                className="font-bold text-xs sm:text-lg md:text-xl mb-1 sm:mb-3 md:mb-0"
+                style={{ color: colors.accent }}
+              >
+                CGPA: {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
+              </p>
+
+              <div className="mt-2 sm:mt-4 text-[10px] sm:text-sm md:text-base text-center md:text-left w-full max-w-xs">
+                <h3 className="text-xs sm:text-base font-semibold mb-1 sm:mb-2" style={{ color: colors.accent }}>
+                  Contact Info
+                </h3>
+                <p>
+                  <span className="font-bold" style={{ color: colors.accent }}>
+                    Email:
+                  </span>{" "}
+                  {student?.email}
+                </p>
+                <p>
+                  <span className="font-bold" style={{ color: colors.accent }}>
+                    Phone:
+                  </span>{" "}
+                  {student?.phone}
+                </p>
+              </div>
+              <p className="text-[8px] sm:text-xs md:text-sm mt-2 sm:mt-4" style={{ color: colors.accent }}>
+                (Click card to flip →)
+              </p>
+            </div>
+          </div>
+
+          {/* Back Card */}
+          <div
+            ref={backRef}
+            className="absolute w-full h-full rounded-2xl shadow-2xl p-2 sm:p-6 flex flex-col justify-center items-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
+            style={{
+              background: getBackGradient(),
+              border: `2px solid ${colors.primary}`,
+              color: colors.text,
+            }}
+          >
+            <h2 className="text-xs sm:text-lg md:text-xl font-bold mb-2 sm:mb-4 text-center">
+              Scan Student QR
+            </h2>
+            {qrData && (
+              <QRCodeCanvas
+                value={qrData}
+                size={window.innerWidth < 640 ? 120 : window.innerWidth < 768 ? 200 : 240}
+                bgColor={colors.secondary}
+                fgColor={colors.accent}
+                level="H"
+                includeMargin={true}
+              />
+            )}
+            <p className="text-[8px] sm:text-xs md:text-sm mt-1 sm:mt-2 text-center" style={{ color: colors.accent }}>
+              Contains student profile data
+            </p>
+            <span className="absolute bottom-1 sm:bottom-3 text-[8px] sm:text-xs" style={{ color: colors.accent }}>
+              (Click to flip back)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Download Buttons */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full max-w-md mx-2 sm:mx-4">
+        <button
+          onClick={() => handleScreenshot(frontRef, "student_front.png")}
+          className="flex items-center justify-center gap-1 sm:gap-2 text-white px-2 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg font-semibold text-[10px] sm:text-sm md:text-base flex-1"
+          style={{ backgroundColor: colors.primary }}
+        >
+          <Download className="w-3 h-3 sm:w-4 sm:h-4" /> Download Front
+        </button>
+        <button
+          onClick={() => handleScreenshot(backRef, "student_back.png")}
+          className="flex items-center justify-center gap-1 sm:gap-2 text-white px-2 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg font-semibold text-[10px] sm:text-sm md:text-base flex-1"
+          style={{ backgroundColor: colors.primary }}
+        >
+          <Download className="w-3 h-3 sm:w-4 sm:h-4" /> Download Back
+        </button>
+      </div>
+    </div>
+  )}
+</div>
+
+
   );
 }
