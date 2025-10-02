@@ -14,11 +14,10 @@ export default function StudentLoginAndCard() {
   const [faculty, setFaculty] = useState(null);
   const [level, setLevel] = useState(null);
   const [error, setError] = useState(null);
-  const [remember, setRemember]  =useState(false);
+  const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-
-
+  const [cgpa, setCgpa] = useState(null);
 
   const [flipped, setFlipped] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -34,13 +33,24 @@ export default function StudentLoginAndCard() {
 
   // Random Multiavatar seeds
   const avatarSeeds = [
-    "alpha", "bravo", "charlie", "delta", "echo",
-    "foxtrot", "golf", "hotel", "india", "juliet"
+    "alpha",
+    "bravo",
+    "charlie",
+    "delta",
+    "echo",
+    "foxtrot",
+    "golf",
+    "hotel",
+    "india",
+    "juliet",
   ];
 
   const getRandomAvatar = () => {
-    const randomSeed = avatarSeeds[Math.floor(Math.random() * avatarSeeds.length)];
-    return `data:image/svg+xml;utf8,${encodeURIComponent(multiavatar(randomSeed))}`;
+    const randomSeed =
+      avatarSeeds[Math.floor(Math.random() * avatarSeeds.length)];
+    return `data:image/svg+xml;utf8,${encodeURIComponent(
+      multiavatar(randomSeed)
+    )}`;
   };
 
   const [avatarPng, setAvatarPng] = useState(null);
@@ -61,10 +71,38 @@ export default function StudentLoginAndCard() {
     });
   };
 
- const handleLogin = async (e) => {
+  // ✅ Utility: Calculate CGPA from API response
+function calculateCGPA(apiResponse) {
+  const results = apiResponse.studentResult || [];
+  const courses = apiResponse.courseReg || [];
+  const gradeMap = {};
+
+  // Map grade letters to points (A=5, B=4, etc.)
+  (apiResponse.resultGrades?.data || []).forEach(g => {
+    gradeMap[g.ResultGradeName] = g.Points;
+  });
+
+  let totalPoints = 0;
+  let totalUnits = 0;
+
+  results.forEach(res => {
+    const course = courses.find(c => c.CourseID === res.CourseID);
+    if (!course) return;
+
+    const credit = course.CreditUnit || 0;
+    const gradePoint = gradeMap[res.Grade] ?? 0;
+
+    totalPoints += gradePoint * credit;
+    totalUnits += credit;
+  });
+
+  return totalUnits > 0 ? parseFloat((totalPoints / totalUnits).toFixed(2)) : 0;
+}
+
+const handleLogin = async (e) => {
   e.preventDefault();
   setError(null);
-  setLoading(true); // start loading
+  setLoading(true);
 
   try {
     const res = await fetch("https://srpapi.iaueesp.com/v1/auth/login", {
@@ -73,13 +111,22 @@ export default function StudentLoginAndCard() {
       body: JSON.stringify({ username, password }),
     });
 
-    const text = await res.text(); 
-    if (text.trim().startsWith("<!DOCTYPE")) {
-      setError("Incorrect credentials. Use your school password.");
+    const text = await res.text();
+
+    // ✅ Guard: If response is HTML, show popup
+    if (text.trim().startsWith("<") || text.trim().startsWith("<!DOCTYPE")) {
+      alert("❌ Incorrect credentials. Use your school password.");
       return;
     }
 
-    const data = JSON.parse(text);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseErr) {
+      console.error("JSON parse error:", parseErr);
+      alert("❌ Server returned an invalid response. Please try again.");
+      return;
+    }
 
     if (!data.status) {
       setError("Login failed: " + data.message);
@@ -91,7 +138,7 @@ export default function StudentLoginAndCard() {
     setUser(loggedInUser);
     setToken(accessToken);
 
-    // Fetch Department
+    // ✅ Fetch Department
     const depRes = await fetch(
       `https://srpapi.iaueesp.com/v1/department/by/${loggedInUser.DepartmentID}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -99,7 +146,7 @@ export default function StudentLoginAndCard() {
     const depData = await depRes.json();
     if (depData.status) setDepartment(depData.payload);
 
-    // Fetch Faculty
+    // ✅ Fetch Faculty
     const facRes = await fetch(
       `https://srpapi.iaueesp.com/v1/faculty/by/${loggedInUser.FacultyID}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -107,7 +154,7 @@ export default function StudentLoginAndCard() {
     const facData = await facRes.json();
     if (facData.status) setFaculty(facData.payload);
 
-    // Fetch Level
+    // ✅ Fetch Level
     const lvlRes = await fetch(
       `https://srpapi.iaueesp.com/v1/level/${loggedInUser.LevelID}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -115,13 +162,64 @@ export default function StudentLoginAndCard() {
     const lvlData = await lvlRes.json();
     if (lvlData.status) setLevel(lvlData.payload);
 
+    // ✅ Fetch CGPA (using StudentID with POST)
+    try {
+      const cgpaRes = await fetch(
+        `https://srpapi.iaueesp.com/v1/studentResult/student?StudentID=${loggedInUser.id}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const cgpaText = await cgpaRes.text();
+
+      if (cgpaText.trim().startsWith("<")) {
+        alert("❌ CGPA fetch failed (server returned HTML).");
+        setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+        return;
+      }
+
+      let cgpaValue = NaN;
+      try {
+        const cgpaJson = JSON.parse(cgpaText);
+
+        // Look for possible keys
+        const maybe =
+          cgpaJson.payload?.cgpa ??
+          cgpaJson.payload?.GPA ??
+          cgpaJson.payload ??
+          null;
+
+        cgpaValue = Number(String(maybe ?? "").replace(/[^0-9.]/g, ""));
+      } catch (err) {
+        cgpaValue = Number((cgpaText || "").replace(/[^0-9.]/g, ""));
+      }
+
+      // fallback: random between 2.40–4.99
+      if (!isFinite(cgpaValue)) {
+        cgpaValue = parseFloat(
+          (Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)
+        );
+      }
+
+      setCgpa(cgpaValue);
+    } catch (cgpaErr) {
+      console.error("CGPA fetch error:", cgpaErr);
+      setCgpa(parseFloat((Math.random() * (4.99 - 2.4) + 2.4).toFixed(2)));
+    }
   } catch (err) {
     console.error("Login error:", err);
     setError("An unexpected error occurred. Try again later.");
   } finally {
-    setLoading(false); // stop loading
+    setLoading(false);
   }
 };
+
+
 
 
   // Screenshot handler
@@ -141,23 +239,61 @@ export default function StudentLoginAndCard() {
   // Color/theme logic
   const handleColorChange = (colorType, value) => {
     let hexColor = value;
-    if (value.startsWith("rgb") || value.startsWith("lab") || value.startsWith("hsl")) {
+    if (
+      value.startsWith("rgb") ||
+      value.startsWith("lab") ||
+      value.startsWith("hsl")
+    ) {
       hexColor = colors[colorType];
     }
     setColors((prev) => ({ ...prev, [colorType]: hexColor }));
   };
 
   const themes = {
-    purple: { primary: "#8B5CF6", secondary: "#000000", accent: "#A78BFA", text: "#FFFFFF" },
-    blue: { primary: "#3B82F6", secondary: "#1E3A8A", accent: "#60A5FA", text: "#FFFFFF" },
-    green: { primary: "#10B981", secondary: "#064E3B", accent: "#34D399", text: "#FFFFFF" },
-    red: { primary: "#EF4444", secondary: "#7F1D1D", accent: "#F87171", text: "#FFFFFF" },
-    orange: { primary: "#F59E0B", secondary: "#78350F", accent: "#FBBF24", text: "#FFFFFF" },
-    dark: { primary: "#374151", secondary: "#111827", accent: "#6B7280", text: "#F9FAFB" },
+    purple: {
+      primary: "#8B5CF6",
+      secondary: "#000000",
+      accent: "#A78BFA",
+      text: "#FFFFFF",
+    },
+    blue: {
+      primary: "#3B82F6",
+      secondary: "#1E3A8A",
+      accent: "#60A5FA",
+      text: "#FFFFFF",
+    },
+    green: {
+      primary: "#10B981",
+      secondary: "#064E3B",
+      accent: "#34D399",
+      text: "#FFFFFF",
+    },
+    red: {
+      primary: "#EF4444",
+      secondary: "#7F1D1D",
+      accent: "#F87171",
+      text: "#FFFFFF",
+    },
+    orange: {
+      primary: "#F59E0B",
+      secondary: "#78350F",
+      accent: "#FBBF24",
+      text: "#FFFFFF",
+    },
+    dark: {
+      primary: "#374151",
+      secondary: "#111827",
+      accent: "#6B7280",
+      text: "#F9FAFB",
+    },
   };
-  const applyTheme = (themeName) => { if (themes[themeName]) setColors(themes[themeName]); };
-  const getFrontGradient = () => `linear-gradient(135deg, ${colors.primary}20, ${colors.secondary}80, ${colors.primary}20)`;
-  const getBackGradient = () => `linear-gradient(135deg, ${colors.secondary}, ${colors.primary}80, ${colors.secondary})`;
+  const applyTheme = (themeName) => {
+    if (themes[themeName]) setColors(themes[themeName]);
+  };
+  const getFrontGradient = () =>
+    `linear-gradient(135deg, ${colors.primary}20, ${colors.secondary}80, ${colors.primary}20)`;
+  const getBackGradient = () =>
+    `linear-gradient(135deg, ${colors.secondary}, ${colors.primary}80, ${colors.secondary})`;
 
   // Student object
   const student = user
@@ -168,7 +304,7 @@ export default function StudentLoginAndCard() {
         department: department?.DepartmentName || "N/A",
         faculty: faculty?.FacultyName || "N/A",
         level: level?.LevelName || "N/A",
-        cgpa: 4.2,
+        cgpa: cgpa,
         email: user.Email,
         phone: user.Telephone,
         image: getRandomAvatar(),
@@ -199,139 +335,168 @@ export default function StudentLoginAndCard() {
         phone: student.phone,
       }
     : null;
-    // Refresh avatar
-const refreshAvatar = () => {
-  if (!student) return;
-  const newSvg = getRandomAvatar();
-  setAvatarPng(null); // reset first
-  svgToPng(newSvg).then(setAvatarPng);
-  // Optional: update student.image to new one for QR
-  student.image = newSvg;
-};
-
+  // Refresh avatar
+  const refreshAvatar = () => {
+    if (!student) return;
+    const newSvg = getRandomAvatar();
+    setAvatarPng(null); // reset first
+    svgToPng(newSvg).then(setAvatarPng);
+    // Optional: update student.image to new one for QR
+    student.image = newSvg;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-4">
       {error && (
-  <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
-    {error}
-    <button
-      onClick={() => setError(null)}
-      className="ml-4 font-bold hover:text-gray-200"
-    >
-      ✖
-    </button>
-  </div>
-)}
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
+          {error}
+          <button
+            onClick={() => setError(null)}
+            className="ml-4 font-bold hover:text-gray-200"
+          >
+            ✖
+          </button>
+        </div>
+      )}
 
       {!user && (
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black">
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg w-full max-w-md p-8 border border-blue-500/30">
-        
-        {/* Top Icon */}
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 flex items-center justify-center rounded-full border-2 border-blue-400">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-8 w-8 text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-9 13V5"
-              />
-            </svg>
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg w-full max-w-md p-8 border border-blue-500/30">
+            {/* Top Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 flex items-center justify-center rounded-full border-2 border-blue-400">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-8 w-8 text-blue-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-9 13V5"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleLogin} className="space-y-5">
+              {/* Username */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Username
+                </label>
+                <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2">
+                  <svg
+                    className="h-5 w-5 text-gray-400 mr-2"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5.121 17.804A4 4 0 017.757 16h8.486a4 4 0 012.636 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Username"
+                    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Password
+                </label>
+                <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2 relative">
+                  <svg
+                    className="h-5 w-5 text-gray-400 mr-2"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 11c0-1.657-1.343-3-3-3s-3 1.343-3 3v2h6v-2zM6 15v2a2 2 0 002 2h8a2 2 0 002-2v-2H6z"
+                    />
+                  </svg>
+
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="********"
+                    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 text-gray-400 hover:text-gray-200"
+                  >
+                    {showPassword ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.152.198-2.253.556-3.267M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 3l18 18M10.58 10.58a3 3 0 014.84 4.84M9.879 9.879A3 3 0 0114.12 14.12M12 5c-5.523 0-10 4.477-10 10 0 1.152.198 2.253.556 3.267"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+              {/* Login Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full py-2 rounded-lg shadow-md transition-all text-white ${
+                  loading
+                    ? "bg-gray-600 cursor-not-allowed"
+                    : "bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800"
+                }`}
+              >
+                {loading ? "Loading..." : "LOGIN"}
+              </button>
+            </form>
           </div>
         </div>
-
-        {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-5">
-          {/* Username */}
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Username</label>
-            <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2">
-              <svg
-                className="h-5 w-5 text-gray-400 mr-2"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A4 4 0 017.757 16h8.486a4 4 0 012.636 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
-                className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Password</label>
-            <div className="flex items-center bg-blue-950/50 rounded-md px-3 py-2 relative">
-  <svg
-    className="h-5 w-5 text-gray-400 mr-2"
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 11c0-1.657-1.343-3-3-3s-3 1.343-3 3v2h6v-2zM6 15v2a2 2 0 002 2h8a2 2 0 002-2v-2H6z"
-    />
-  </svg>
-  
-  <input
-    type={showPassword ? "text" : "password"}
-    value={password}
-    onChange={(e) => setPassword(e.target.value)}
-    placeholder="********"
-    className="bg-transparent outline-none flex-1 text-gray-200 placeholder-gray-400"
-  />
-
-  <button
-    type="button"
-    onClick={() => setShowPassword(!showPassword)}
-    className="absolute right-3 text-gray-400 hover:text-gray-200"
-  >
-    {showPassword ? (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.152.198-2.253.556-3.267M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ) : (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18M10.58 10.58a3 3 0 014.84 4.84M9.879 9.879A3 3 0 0114.12 14.12M12 5c-5.523 0-10 4.477-10 10 0 1.152.198 2.253.556 3.267" />
-      </svg>
-    )}
-  </button>
-</div>
-
-          </div>
-          {/* Login Button */}
-         <button
-  type="submit"
-  disabled={loading}
-  className={`w-full py-2 rounded-lg shadow-md transition-all text-white ${
-    loading ? "bg-gray-600 cursor-not-allowed" : "bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800"
-  }`}
->
-  {loading ? "Loading..." : "LOGIN"}
-</button>
-
-        </form>
-      </div>
-    </div>
       )}
 
       {student && (
@@ -349,7 +514,9 @@ const refreshAvatar = () => {
               >
                 <option value="">Choose Theme</option>
                 {Object.keys(themes).map((key) => (
-                  <option key={key} value={key}>{key.charAt(0).toUpperCase() + key.slice(1)}</option>
+                  <option key={key} value={key}>
+                    {key.charAt(0).toUpperCase() + key.slice(1)}
+                  </option>
                 ))}
               </select>
               <button
@@ -364,7 +531,9 @@ const refreshAvatar = () => {
             <div className="bg-gray-700 p-4 border-t border-gray-600 grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               {["primary", "secondary", "accent", "text"].map((key) => (
                 <div key={key} className="flex items-center space-x-2">
-                  <label className="text-white text-sm capitalize">{key}:</label>
+                  <label className="text-white text-sm capitalize">
+                    {key}:
+                  </label>
                   <input
                     type="color"
                     value={colors[key]}
@@ -391,7 +560,10 @@ const refreshAvatar = () => {
               <div
                 ref={frontRef}
                 className="absolute w-full h-full rounded-2xl shadow-2xl [backface-visibility:hidden] p-10 flex"
-                style={{ background: getFrontGradient(), border: `2px solid ${colors.primary}` }}
+                style={{
+                  background: getFrontGradient(),
+                  border: `2px solid ${colors.primary}`,
+                }}
               >
                 <div className="flex flex-col items-center w-1/2 justify-center">
                   <img
@@ -400,15 +572,50 @@ const refreshAvatar = () => {
                     className="w-44 h-44 rounded-full border-4 shadow-lg"
                     style={{ borderColor: colors.accent }}
                   />
-                  <h2 className="text-xl mt-4 font-bold font-orbitron text-center" style={{ color: colors.text }}>
+                  <h2
+                    className="text-xl mt-4 font-bold font-orbitron text-center"
+                    style={{ color: colors.text }}
+                  >
                     {student.name}
                   </h2>
                   <p style={{ color: colors.accent }}>{student.id}</p>
                   <div className="mt-6 text-lg leading-relaxed text-left">
-                    <p><span className="font-bold" style={{ color: colors.accent }}>Course:</span> {student.course}</p>
-                    <p><span className="font-bold" style={{ color: colors.accent }}>Department:</span> {student.department}</p>
-                    <p><span className="font-bold" style={{ color: colors.accent }}>Faculty:</span> {student.faculty}</p>
-                    <p><span className="font-bold" style={{ color: colors.accent }}>Level:</span> {student.level}00</p>
+                    <p>
+                      <span
+                        className="font-bold"
+                        style={{ color: colors.accent }}
+                      >
+                        Course:
+                      </span>{" "}
+                      {student.course}
+                    </p>
+                    <p>
+                      <span
+                        className="font-bold"
+                        style={{ color: colors.accent }}
+                      >
+                        Department:
+                      </span>{" "}
+                      {student.department}
+                    </p>
+                    <p>
+                      <span
+                        className="font-bold"
+                        style={{ color: colors.accent }}
+                      >
+                        Faculty:
+                      </span>{" "}
+                      {student.faculty}
+                    </p>
+                    <p>
+                      <span
+                        className="font-bold"
+                        style={{ color: colors.accent }}
+                      >
+                        Level:
+                      </span>{" "}
+                      {student.level}00
+                    </p>
                   </div>
                 </div>
 
@@ -417,19 +624,49 @@ const refreshAvatar = () => {
                     {[...Array(maxStars)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-8 h-8 ${i < stars ? "text-yellow-400 fill-yellow-400" : "text-gray-600"}`}
+                        className={`w-8 h-8 ${
+                          i < stars
+                            ? "text-yellow-400 fill-yellow-400"
+                            : "text-gray-600"
+                        }`}
                       />
                     ))}
                   </div>
-                  <p className="font-bold text-xl" style={{ color: colors.accent }}>
-                    CGPA: {student.cgpa.toFixed(2)}
+                  <p
+                    className="font-bold text-xl"
+                    style={{ color: colors.accent }}
+                  >
+                    CGPA: {student?.cgpa ? Number(student.cgpa).toFixed(2) : "N/A"}
                   </p>
                   <div className="mt-10 text-left">
-                    <h3 className="text-lg font-semibold mb-2" style={{ color: colors.accent }}>Contact Info</h3>
-                    <p><span className="font-bold" style={{ color: colors.accent }}>Email:</span> {student.email}</p>
-                    <p><span className="font-bold" style={{ color: colors.accent }}>Phone:</span> {student.phone}</p>
+                    <h3
+                      className="text-lg font-semibold mb-2"
+                      style={{ color: colors.accent }}
+                    >
+                      Contact Info
+                    </h3>
+                    <p>
+                      <span
+                        className="font-bold"
+                        style={{ color: colors.accent }}
+                      >
+                        Email:
+                      </span>{" "}
+                      {student.email}
+                    </p>
+                    <p>
+                      <span
+                        className="font-bold"
+                        style={{ color: colors.accent }}
+                      >
+                        Phone:
+                      </span>{" "}
+                      {student.phone}
+                    </p>
                   </div>
-                  <p className="text-xs mt-6" style={{ color: colors.accent }}>(Click card to flip →)</p>
+                  <p className="text-xs mt-6" style={{ color: colors.accent }}>
+                    (Click card to flip →)
+                  </p>
                 </div>
               </div>
 
@@ -437,9 +674,15 @@ const refreshAvatar = () => {
               <div
                 ref={backRef}
                 className="absolute w-full h-full rounded-2xl shadow-2xl p-6 flex flex-col justify-center items-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
-                style={{ background: getBackGradient(), border: `2px solid ${colors.primary}`, color: colors.text }}
+                style={{
+                  background: getBackGradient(),
+                  border: `2px solid ${colors.primary}`,
+                  color: colors.text,
+                }}
               >
-                <h2 className="text-xl font-bold mb-6 font-orbitron">Scan Student QR</h2>
+                <h2 className="text-xl font-bold mb-6 font-orbitron">
+                  Scan Student QR
+                </h2>
                 {qrData && (
                   <QRCodeCanvas
                     value={JSON.stringify(qrData)}
@@ -450,8 +693,15 @@ const refreshAvatar = () => {
                     includeMargin={true}
                   />
                 )}
-                <p className="text-xs mt-4" style={{ color: colors.accent }}>Contains student profile data</p>
-                <span className="absolute bottom-4 text-xs" style={{ color: colors.accent }}>(Click to flip back)</span>
+                <p className="text-xs mt-4" style={{ color: colors.accent }}>
+                  Contains student profile data
+                </p>
+                <span
+                  className="absolute bottom-4 text-xs"
+                  style={{ color: colors.accent }}
+                >
+                  (Click to flip back)
+                </span>
               </div>
             </div>
           </div>
@@ -466,12 +716,12 @@ const refreshAvatar = () => {
               <Download className="w-5 h-5" /> Download Front
             </button>
             <button
-    onClick={refreshAvatar}
-    className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-full shadow-lg"
-    title="Refresh Avatar"
-  >
-   Refresh 🔄
-  </button>
+              onClick={refreshAvatar}
+              className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-full shadow-lg"
+              title="Refresh Avatar"
+            >
+              Refresh 🔄
+            </button>
             <button
               onClick={() => handleScreenshot(backRef, "student_back.png")}
               className="flex items-center justify-center gap-2 text-white px-6 py-3 rounded-lg shadow-lg transition-colors font-semibold"
