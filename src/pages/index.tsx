@@ -531,7 +531,7 @@ export default function StudentLoginAndCard() {
         <form onSubmit={handleLogin} className="space-y-3 sm:space-y-5">
           <div>
             <label className="block text-xs sm:text-sm text-gray-300 mb-1">
-              Username
+              Matric Number
             </label>
             <div className="flex items-center bg-blue-950/50 rounded-md px-2 sm:px-3 py-1.5 sm:py-2 border border-blue-500/30">
               <svg
