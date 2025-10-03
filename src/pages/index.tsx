@@ -644,6 +644,32 @@ export default function StudentLoginAndCard() {
     </div>
   ) : (
     <div className="flex flex-col items-center space-y-4 sm:space-y-6 max-w-7xl mx-auto w-full">
+      {/* <div className="flex flex-col items-center space-y-6 max-w-7xl mx-auto"> */}
+      <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4 mb-4 px-4">
+        <h1 className="text-xl md:text-2xl font-bold text-white text-center sm:text-left"> Student Profile IAUOE </h1>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <select onChange={(e) => applyTheme(e.target.value)} className="bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600 w-full sm:w-auto text-sm md:text-base" defaultValue="" >
+            <option value="">Choose Theme</option> 
+            {Object.keys(themes).map((key) => ( 
+              <option key={key} value={key}> {key.charAt(0).toUpperCase() + key.slice(1)} </option> 
+            ))}
+          </select>
+          <button onClick={() => setShowColorPicker(!showColorPicker)} className="flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors w-full sm:w-auto text-sm md:text-base" >
+            <Palette className="w-4 h-4 md:w-5 md:h-5" /> Custom Colors 
+          </button>
+        </div>
+      </div> 
+      {showColorPicker && ( 
+        <div className="bg-gray-700 p-4 border-t border-gray-600 grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 w-full max-w-2xl mx-4"> 
+        {Object.keys(colors).map((key) => ( 
+          <div key={key} className="flex items-center space-x-2">
+            <label className="text-white text-sm capitalize whitespace-nowrap"> {key}: </label>
+            <input type="color" value={colors[key as keyof Colors]} onChange={(e) => handleColorChange(key as keyof Colors, e.target.value) } className="w-8 h-8 rounded cursor-pointer flex-shrink-0" />
+            <span className="text-xs text-gray-300 hidden sm:inline"> {colors[key as keyof Colors]} </span> 
+          </div>
+        ))} 
+      </div> 
+    )}
       {/* Refresh Avatar Button */}
       <button
         onClick={refreshAvatar}
@@ -812,7 +838,5 @@ export default function StudentLoginAndCard() {
     </div>
   )}
 </div>
-
-
   );
 }
